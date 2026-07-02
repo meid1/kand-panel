@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VPanel — админка</title>
+<style>
+  :root{--bg:#0f1420;--card:#182130;--line:#26324a;--txt:#e6edf7;--mut:#8b9bb4;--acc:#3b82f6;--ok:#22c55e;--bad:#ef4444}
+  *{box-sizing:border-box} body{margin:0;font:15px/1.45 system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt)}
+  a{color:var(--acc)} button{cursor:pointer;font:inherit}
+  .hidden{display:none!important}
+  #login{max-width:340px;margin:12vh auto;padding:24px;background:var(--card);border:1px solid var(--line);border-radius:14px}
+  #login h1{font-size:20px;margin:0 0 16px}
+  input,textarea,select{width:100%;padding:10px;background:#0c1119;border:1px solid var(--line);border-radius:9px;color:var(--txt);margin:6px 0}
+  textarea{min-height:80px;resize:vertical}
+  .btn{background:var(--acc);border:0;color:#fff;padding:10px 14px;border-radius:9px}
+  .btn.sec{background:#26324a} .btn.bad{background:var(--bad)} .btn.sm{padding:5px 9px;font-size:13px}
+  header{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--card);position:sticky;top:0;z-index:5}
+  header b{font-size:17px} nav{display:flex;gap:6px;flex-wrap:wrap}
+  nav button{background:transparent;border:1px solid var(--line);color:var(--mut);padding:7px 12px;border-radius:20px}
+  nav button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+  main{max-width:960px;margin:0 auto;padding:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:0 0 14px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .grow{flex:1} .mut{color:var(--mut);font-size:13px} .pill{font-size:12px;padding:2px 8px;border-radius:20px;background:#26324a}
+  .pill.ok{background:#14351f;color:var(--ok)} .pill.bad{background:#3a1717;color:var(--bad)}
+  table{width:100%;border-collapse:collapse} td,th{text-align:left;padding:8px;border-bottom:1px solid var(--line);font-size:14px}
+  label.fld{display:block;margin:10px 0 2px;color:var(--mut);font-size:13px}
+  code{background:#0c1119;padding:2px 6px;border-radius:6px;word-break:break-all}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#0c1119;border:1px solid var(--line);padding:10px 16px;border-radius:10px}
+</style>
+</head>
+<body>
+<div id="login">
+  <h1>VPanel — вход</h1>
+  <input id="pw" type="password" placeholder="Пароль администратора" autocomplete="current-password">
+  <button class="btn" style="width:100%" onclick="doLogin()">Войти</button>
+  <div id="loginErr" class="mut" style="color:var(--bad);margin-top:8px"></div>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <b>VPanel</b>
+    <nav>
+      <button data-tab="nodes" class="on">Ноды</button>
+      <button data-tab="users">Клиенты</button>
+      <button data-tab="texts">Тексты и кнопки</button>
+      <button data-tab="payments">Платёжки</button>
+      <button data-tab="broadcast">Рассылка</button>
+      <button data-tab="tenants">Франшизы</button>
+      <button data-tab="brand">Бренд</button>
+      <button data-tab="audit">Аудит</button>
+    </nav>
+    <span class="grow"></span>
+    <button class="btn sec sm" onclick="logout()">Выйти</button>
+  </header>
+  <main>
+    <div id="tab-nodes"></div>
+    <div id="tab-users" class="hidden"></div>
+    <div id="tab-texts" class="hidden"></div>
+    <div id="tab-payments" class="hidden"></div>
+    <div id="tab-broadcast" class="hidden"></div>
+    <div id="tab-tenants" class="hidden"></div>
+    <div id="tab-brand" class="hidden"></div>
+    <div id="tab-audit" class="hidden"></div>
+  </main>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>

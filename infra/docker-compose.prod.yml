@@ -1,0 +1,28 @@
+# Kand — боевой запуск: postgres + redis + api. `docker compose -f infra/docker-compose.prod.yml up -d --build`
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kand
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kand}
+      POSTGRES_DB: kand
+    volumes:
+      - kand_pg:/var/lib/postgresql/data
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgresql://kand:${POSTGRES_PASSWORD:-kand}@postgres:5432/kand
+      REDIS_URL: redis://redis:6379
+    depends_on: [postgres, redis]
+    ports:
+      - "${API_PORT:-3000}:3000"
+volumes:
+  kand_pg:

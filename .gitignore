@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+packages/db/generated/
+# build artifacts / runtime
+agent/vpanel-agent
+apps/api/public/*.map
+.autobuild_*
+*.bak_*

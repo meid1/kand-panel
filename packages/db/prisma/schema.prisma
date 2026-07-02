@@ -1,0 +1,173 @@
+// VPanel — схема БД (PostgreSQL). Draft v1 (Фаза 0). Мультитенант + наши фишки.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Тенант = платформа-владелец ИЛИ франшиза (мультитенант, изоляция клиентов).
+model Tenant {
+  id            String   @id @default(cuid())
+  kind          String   @default("franchise") // "platform" | "franchise"
+  brand         String   @default("VPN")
+  brandColor    String?
+  ownerTgId     BigInt?
+  botToken      String?  // токен Telegram-бота франшизы
+  botUsername   String?
+  domain        String?  @unique // кастом-домен (авто-HTTPS)
+  domainVerified Boolean @default(false)
+  sharePercent  Int      @default(50)   // доля франшизы
+  balance       Decimal  @default(0)
+  pricePerMonth Decimal  @default(90)
+  welcomeText   String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  users         User[]
+  nodes         Node[]   // BYON-ноды франшизы (изоляция)
+  payments      Payment[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  tgId         BigInt
+  externalId   String?  // id исходной системы при импорте (напр. "cat_12345") — для дедупа/маппинга
+  tgUsername   String?
+  tgName       String?
+  expireAt     DateTime?
+  isTrial      Boolean  @default(true)
+  trialUsed    Boolean  @default(false)
+  isBlocked    Boolean  @default(false)
+  autoRenew    Boolean  @default(false)
+  balance      Decimal  @default(0)
+  createdAt    DateTime @default(now())
+  devices      Device[]
+  payments     Payment[]
+  bypass       BypassUsage?
+  @@unique([tenantId, tgId]) // Phase 0 изоляция: (тенант, tg) = 1 аккаунт
+  @@index([tenantId, externalId]) // дедуп при импорте по исходному id
+}
+
+/// Устройство = один VLESS-uuid, отдаётся в подписке.
+model Device {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  name       String   @default("Устройство")
+  vlessUuid  String   @unique
+  subToken   String   @unique
+  createdAt  DateTime @default(now())
+  keySync    KeySyncStatus[]
+}
+
+/// Нода = Docker-контейнер с xray. Провижн через mTLS+JWT (без SSH).
+model Node {
+  id           String   @id @default(cuid())
+  tenantId     String?  // null = общий пул платформы; иначе BYON франшизы
+  tenant       Tenant?  @relation(fields: [tenantId], references: [id])
+  label        String
+  address      String   // хост/IP для клиентских ссылок
+  ip           String
+  secretKey    String   // base64(nodeCert+nodeKey+caCert+jwtPubkey) для mTLS
+  port         Int      @default(443)
+  protocols    String[] // reality-tcp, reality-grpc, hysteria2, xhttp
+  sni          String?
+  realityPbk   String?
+  realitySid   String?
+  isActive     Boolean  @default(true)
+  showInSub    Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  role         String   @default("exit") // exit | bypass-origin | yt-ru | warp
+  trafficLimitGb Int?
+  online       Boolean  @default(false)
+  lastCheck    DateTime?
+  keySync      KeySyncStatus[]
+  inbounds     Inbound[]
+  createdAt    DateTime @default(now())
+}
+
+model Inbound {
+  id        String  @id @default(cuid())
+  nodeId    String
+  node      Node    @relation(fields: [nodeId], references: [id])
+  tag       String
+  protocol  String
+  network   String  // tcp | grpc | xhttp | hysteria
+  port      Int
+}
+
+model KeySyncStatus {
+  id         String   @id @default(cuid())
+  deviceId   String
+  device     Device   @relation(fields: [deviceId], references: [id])
+  nodeId     String
+  node       Node     @relation(fields: [nodeId], references: [id])
+  synced     Boolean  @default(false)
+  lastAttempt DateTime?
+  lastError  String?
+  @@unique([deviceId, nodeId])
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  amount     Decimal
+  method     String   // provider id: yookassa|cryptobot|cryptomus|lava|... (реестр)
+  status     String   @default("pending") // pending|paid|failed|refunded
+  invoiceId  String?  // внешний id платежа у провайдера
+  days       Int?     // сколько дней подписки начислить при успешной оплате
+  description String?
+  createdAt  DateTime @default(now())
+  paidAt     DateTime?
+  @@index([tenantId, status])
+}
+
+/// Метринг обхода (ОБХОД БС): лимит ГБ per-user, докупка, подарки.
+model BypassUsage {
+  userId        String   @id
+  user          User     @relation(fields: [userId], references: [id])
+  totalBytes    BigInt   @default(0)
+  baselineBytes BigInt   @default(0)
+  purchasedBytes BigInt  @default(0)
+  giftBytes     BigInt   @default(0)
+  giftUntil     DateTime?
+  capGb         Int?     // тарифный лимит
+  capManualGb   Int?     // ручной admin-лимит (перебивает)
+  isSuspended   Boolean  @default(false)
+  periodStart   DateTime @default(now())
+}
+
+model PromoCode {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  type      String   // days | percent | bypass_gb
+  value     Float
+  maxUses   Int      @default(1)
+  usedCount Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+/// Глобальные настройки платформы (флаги, маршрутизация, цены).
+model Setting {
+  key   String @id
+  value String
+}
+
+/// Аудит действий в админке (кто что менял) — на случай компрометации.
+model AuditLog {
+  id        String   @id @default(cuid())
+  actor     String   // "admin" (или id пользователя в будущем)
+  action    String   // "POST /nodes", "DELETE /users/:id" …
+  target    String?  // id объекта
+  ip        String?
+  meta      String?  // краткий JSON тела запроса БЕЗ секретов
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+}

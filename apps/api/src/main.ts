@@ -1,0 +1,26 @@
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import helmet from 'helmet';
+import { join } from 'path';
+import { AppModule } from './app.module';
+
+// BigInt (tgId, ownerTgId) не сериализуется JSON.stringify по умолчанию —
+// отдаём его строкой во всех JSON-ответах.
+(BigInt.prototype as any).toJSON = function () { return this.toString(); };
+
+async function bootstrap() {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
+  // helmet с ослабленным CSP — админка использует инлайновый скрипт/стили
+  app.use(helmet({ contentSecurityPolicy: false }));
+  // статика веб-админки (index.html + app.js)
+  app.useStaticAssets(join(process.env.VPANEL_ROOT || '/opt/vpanel', 'apps/api/public'));
+  app.enableCors({ origin: process.env.CORS_ORIGIN?.split(',') ?? false });
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  // публичные роуты без /api: подписка клиента и install-артефакты ноды
+  app.setGlobalPrefix('api', {
+    exclude: ['install-node.sh', 'install/vpanel-agent', 'sub/:token', 'sub/:token/xray'],
+  });
+  await app.listen(Number(process.env.API_PORT) || 3000);
+}
+bootstrap();

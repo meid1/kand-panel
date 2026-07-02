@@ -1,0 +1,213 @@
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { generateKeyPairSync, randomBytes } from 'crypto';
+import { PrismaService } from '../prisma/prisma.service';
+import { CryptoService } from '../crypto/crypto.service';
+import { CreateNodeDto, Protocol } from './dto/create-node.dto';
+import { UpdateNodeDto } from './dto/update-node.dto';
+
+/**
+ * Управление нодами: добавление «одной командой», выпуск mTLS-кред, генерация
+ * Reality-ключей, набор инбаундов по выбранным протоколам, CRUD, сортировка.
+ *
+ * Секрет ноды (secretKey) — base64(JSON) c её серверным сертом+ключом, публичным
+ * CA-сертом и общим JWT-секретом. Приватные ключи CA/панели в bundle НЕ попадают.
+ */
+@Injectable()
+export class NodesService {
+  constructor(
+    private prisma: PrismaService,
+    private crypto: CryptoService,
+    private config: ConfigService,
+  ) {}
+
+  // ── Reality X25519: xray ждёт base64url(raw 32 байта) ────────────────────
+  private realityKeypair(): { pbk: string; pvk: string } {
+    const { publicKey, privateKey } = generateKeyPairSync('x25519');
+    const pub = publicKey.export({ format: 'jwk' }) as { x: string };
+    const prv = privateKey.export({ format: 'jwk' }) as { d: string };
+    // jwk уже base64url без паддинга — ровно формат xray
+    return { pbk: pub.x, pvk: prv.d };
+  }
+
+  // короткий shortId Reality (8 байт hex)
+  private shortId(): string {
+    return randomBytes(8).toString('hex');
+  }
+
+  /** Инбаунды под выбранные протоколы (структура для xray-конфига ноды). */
+  private buildInbounds(protocols: Protocol[], basePort: number) {
+    const map: Record<Protocol, { protocol: string; network: string }> = {
+      'reality-tcp': { protocol: 'vless', network: 'tcp' },
+      'reality-grpc': { protocol: 'vless', network: 'grpc' },
+      hysteria2: { protocol: 'hysteria2', network: 'udp' },
+      xhttp: { protocol: 'vless', network: 'xhttp' },
+    };
+    // порт: reality-tcp на основном (443), остальные разносим (+1,+2…)
+    let extra = 0;
+    return protocols.map((p) => {
+      const m = map[p];
+      const port = p === 'reality-tcp' ? basePort : basePort + ++extra;
+      return { tag: p, protocol: m.protocol, network: m.network, port };
+    });
+  }
+
+  async create(dto: CreateNodeDto) {
+    if (!dto.protocols?.length) throw new BadRequestException('нужен хотя бы один протокол');
+
+    const port = dto.port ?? 443;
+    const reality = this.realityKeypair();
+    const sid = this.shortId();
+    const sni = dto.sni ?? 'www.microsoft.com';
+    const ibs = this.buildInbounds(dto.protocols, port);
+
+    // mTLS-креды ноды + общий CA/JWT
+    const nodeCert = await this.crypto.issueNodeCert(dto.ip, dto.address);
+    const caPem = await this.crypto.getCaCertPem();
+    const jwt = await this.crypto.getNodeJwtSecret();
+
+    // ПОЛНЫЙ базовый xray-конфиг ноды кладём в bundle — установщик просто пишет
+    // его на диск, ничего сам не собирает (dumb installer = меньше багов).
+    const xray = this.buildXrayConfig(ibs, reality.pvk, sid, sni);
+
+    const bundle = Buffer.from(
+      JSON.stringify({
+        cert: nodeCert.certPem,
+        key: nodeCert.keyPem,
+        ca: caPem,
+        jwt,
+        agent_port: 8443,
+        xray, // базовый конфиг xray (инбаунды + reality + api + routing)
+      }),
+    ).toString('base64');
+
+    const node = await this.prisma.node.create({
+      data: {
+        tenantId: dto.tenantId ?? null,
+        label: dto.label,
+        address: dto.address,
+        ip: dto.ip,
+        port,
+        protocols: dto.protocols,
+        sni,
+        realityPbk: reality.pbk,
+        realitySid: sid,
+        secretKey: bundle,
+        role: dto.role ?? 'exit',
+        trafficLimitGb: dto.trafficLimitGb ?? null,
+        showInSub: dto.showInSub ?? true,
+        inbounds: {
+          create: ibs.map((i) => ({
+            tag: i.tag, protocol: i.protocol, network: i.network, port: i.port,
+          })),
+        } as any,
+      },
+    });
+
+    const install = this.installCommand(node.id, bundle);
+    return { node: this.strip(node), install };
+  }
+
+  /** Базовый xray-конфиг: reality/xhttp-инбаунды + api + routing. */
+  private buildXrayConfig(
+    ibs: { tag: string; protocol: string; network: string; port: number }[],
+    pvk: string, sid: string, sni: string,
+  ) {
+    const dest = `${sni}:443`;
+    const inbounds: any[] = [];
+    for (const i of ibs) {
+      if (i.protocol === 'hysteria2') continue; // xray-core не умеет hy2 (нужен sing-box) — пропускаем
+      const stream: any = {
+        network: i.network,
+        security: 'reality',
+        realitySettings: { dest, serverNames: [sni], privateKey: pvk, shortIds: [sid] },
+      };
+      if (i.network === 'grpc') stream.grpcSettings = { serviceName: i.tag };
+      if (i.network === 'xhttp') stream.xhttpSettings = { path: '/' };
+      inbounds.push({
+        tag: i.tag, port: i.port, protocol: 'vless',
+        settings: { clients: [], decryption: 'none' },
+        streamSettings: stream,
+        sniffing: { enabled: true, destOverride: ['http', 'tls', 'quic'] },
+      });
+    }
+    // API-инбаунд (для live add/remove клиентов через `xray api`)
+    inbounds.push({
+      tag: 'api', listen: '127.0.0.1', port: 10085,
+      protocol: 'dokodemo-door', settings: { address: '127.0.0.1' },
+    });
+    return {
+      log: { loglevel: 'warning' },
+      api: { tag: 'api', services: ['HandlerService', 'StatsService'] },
+      stats: {}, // включаем сбор статистики
+      policy: {
+        // per-user учёт трафика (для лимитов/обхода) + системный
+        levels: { '0': { statsUserUplink: true, statsUserDownlink: true } },
+        system: { statsInboundUplink: true, statsInboundDownlink: true },
+      },
+      inbounds,
+      outbounds: [
+        { protocol: 'freedom', tag: 'direct' },
+        { protocol: 'blackhole', tag: 'block' },
+      ],
+      routing: { rules: [{ type: 'field', inboundTag: ['api'], outboundTag: 'api' }] },
+    };
+  }
+
+  /** Одна команда для установки ноды (агент + xray + конфиг) — весь секрет в bundle. */
+  private installCommand(nodeId: string, bundle: string): string {
+    const base = this.config.get<string>('PANEL_URL') || 'https://panel.example.com';
+    // install-node.sh скачивается с панели; секреты передаём env (не в argv-логах)
+    return (
+      `curl -fsSL ${base}/install-node.sh | ` +
+      `NODE_ID=${nodeId} PANEL_URL=${base} NODE_BUNDLE='${bundle}' bash`
+    );
+  }
+
+  async findAll(tenantId?: string) {
+    const nodes = await this.prisma.node.findMany({
+      where: tenantId ? { tenantId } : undefined,
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      include: { inbounds: true } as any,
+    });
+    return nodes.map((n) => this.strip(n));
+  }
+
+  async findOne(id: string) {
+    const n = await this.prisma.node.findUnique({
+      where: { id }, include: { inbounds: true } as any,
+    });
+    if (!n) throw new NotFoundException('нода не найдена');
+    return this.strip(n);
+  }
+
+  async update(id: string, dto: UpdateNodeDto) {
+    await this.findOne(id);
+    const n = await this.prisma.node.update({ where: { id }, data: dto });
+    return this.strip(n);
+  }
+
+  async remove(id: string) {
+    await this.findOne(id);
+    await this.prisma.keySyncStatus.deleteMany({ where: { nodeId: id } });
+    await this.prisma.inbound.deleteMany({ where: { nodeId: id } });
+    await this.prisma.node.delete({ where: { id } });
+    return { ok: true };
+  }
+
+  /** Перестановка нод в подписке (drag-reorder в админке). */
+  async reorder(ids: string[]) {
+    await this.prisma.$transaction(
+      ids.map((id, i) =>
+        this.prisma.node.update({ where: { id }, data: { sortOrder: i } }),
+      ),
+    );
+    return { ok: true };
+  }
+
+  /** Убираем секреты из ответа API (secretKey/pvk никогда не отдаём в UI). */
+  private strip(n: any) {
+    const { secretKey, ...safe } = n;
+    return safe;
+  }
+}

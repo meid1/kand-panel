@@ -27,7 +27,7 @@ export class SettingsService {
 
   /** Бренд/поддержка — тоже из настроек, с дефолтами (никогда не пусто). */
   async brand(): Promise<string> { return (await this.raw('brand')) || 'VPN'; }
-  async support(): Promise<string> { return (await this.raw('support')) || '@support'; }
+  async support(): Promise<string> { return (await this.raw('support')) || '@marius_support'; }
 
   /** Список всех редактируемых текстов с ЭФФЕКТИВНЫМИ значениями (для админки). */
   async list() {

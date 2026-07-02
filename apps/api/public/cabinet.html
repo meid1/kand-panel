@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Личный кабинет</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#030712;--bg2:#060c1c;--card:#0b1220;--cardhi:#111a2b;--line:#1b2740;
+        --accent:#00d4ff;--ok:#34D399;--err:#ff4d6d;--gold:#FBBF24;--txt:#f4f8ff;--mut:#9aa7c2;--dim:#5d6b86}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:'Manrope',system-ui,sans-serif;
+       letter-spacing:-.01em;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:520px;margin:0 auto;padding:20px 16px 40px}
+  .brand{display:flex;align-items:center;gap:10px;margin:8px 0 20px}
+  .brand .dot{width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:0 0 16px var(--accent)}
+  .brand h1{font-size:20px;font-weight:800;margin:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin:0 0 14px}
+  .status{display:flex;align-items:center;justify-content:space-between}
+  .big{font-size:30px;font-weight:800;line-height:1.1}
+  .sub{color:var(--mut);font-size:13px;margin-top:4px}
+  .badge{font-size:12px;font-weight:700;padding:5px 11px;border-radius:20px}
+  .badge.ok{background:rgba(52,211,153,.14);color:var(--ok)}
+  .badge.err{background:rgba(255,77,109,.14);color:var(--err)}
+  .bar{height:9px;border-radius:6px;background:#0c1526;overflow:hidden;margin:10px 0 6px}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#7dd3fc)}
+  .lbl{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-bottom:8px}
+  .dev{display:flex;align-items:center;gap:10px;padding:11px 0;border-top:1px solid var(--line)}
+  .dev:first-of-type{border-top:0}
+  .dev .nm{font-weight:600;flex:1}
+  .btn{background:var(--accent);color:#00131a;border:0;font-weight:700;padding:11px 15px;border-radius:12px;
+       font:inherit;font-weight:700;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--txt);font-weight:600}
+  .btn.sm{padding:7px 11px;font-size:13px}
+  .btn.block{display:block;width:100%;text-align:center;margin-top:6px}
+  .pays{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+  a.btn{text-decoration:none;display:inline-block}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#0c1119;border:1px solid var(--line);
+         padding:10px 16px;border-radius:12px}
+  .mut{color:var(--mut)} .center{text-align:center}
+  .skeleton{opacity:.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><span class="dot"></span><h1 id="brand">Кабинет</h1></div>
+  <div id="app" class="skeleton"><div class="card center mut">Загрузка…</div></div>
+</div>
+<script>
+const token = location.pathname.split('/')[2] || '';
+const $ = (id) => document.getElementById(id);
+function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2200);}
+function copy(s){navigator.clipboard?.writeText(s).then(()=>toast('Скопировано'),()=>toast(s));}
+const esc=(s)=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function load(){
+  let d;
+  try{ const r=await fetch(`/api/cabinet/${token}/data`); if(!r.ok) throw 0; d=await r.json(); }
+  catch{ $('app').innerHTML='<div class="card center err">Кабинет не найден или ссылка устарела.</div>'; return; }
+  document.documentElement.style.setProperty('--accent', d.accent||'#00d4ff');
+  $('brand').textContent = d.brand||'Кабинет';
+  document.title = (d.brand||'Кабинет')+' — личный кабинет';
+
+  const bp = d.bypass||{};
+  const usedPct = (!bp.unlimited && bp.capGb) ? Math.min(100, Math.round((bp.usedGb/bp.capGb)*100)) : 0;
+  const bypassBlock = bp.unlimited
+    ? `<div class="lbl">Обход белых списков</div><div>Безлимит</div>`
+    : `<div class="lbl">Обход белых списков ${bp.suspended?'<span class="badge err" style="margin-left:6px">исчерпан</span>':''}</div>
+       <div class="bar"><i style="width:${usedPct}%"></i></div>
+       <div class="sub">${(bp.remainingGb??0).toFixed(1)} ГБ осталось из ${(bp.capGb??0).toFixed(1)}</div>`;
+
+  const devs = (d.devices||[]).map(dev=>`
+    <div class="dev">
+      <div class="nm">${esc(dev.name)}</div>
+      <button class="btn ghost sm" onclick="copy('${esc(dev.sub)}')">Ссылка</button>
+      <button class="btn sm" onclick="copy('${esc(dev.smart)}')">Умная</button>
+    </div>`).join('') || '<div class="mut center">нет устройств</div>';
+
+  const pays = (d.payMethods||[]).map(m=>`<button class="btn ghost" onclick="buy('${m.id}')">${esc(m.title)}</button>`).join('')
+    || '<div class="mut center" style="grid-column:1/3">оплата недоступна</div>';
+
+  $('app').className='';
+  $('app').innerHTML = `
+    <div class="card">
+      <div class="status">
+        <div>
+          <div class="big">${d.active ? (d.daysLeft!=null? d.daysLeft+' дн.' : 'Активна') : 'Неактивна'}</div>
+          <div class="sub">${d.expireAt ? 'до '+new Date(d.expireAt).toLocaleDateString('ru-RU') : 'подписка'}</div>
+        </div>
+        <span class="badge ${d.active?'ok':'err'}">${d.active?'активна':'истекла'}</span>
+      </div>
+      <div style="margin-top:14px">${bypassBlock}</div>
+    </div>
+
+    <div class="card">
+      <div class="lbl">Мои устройства</div>
+      ${devs}
+    </div>
+
+    <div class="card">
+      <div class="lbl">Продлить подписку</div>
+      <div class="pays">${pays}</div>
+    </div>
+
+    <div class="center mut" style="font-size:12px;margin-top:8px">
+      Вставьте ссылку в приложение: v2rayNG · Streisand · Hiddify
+    </div>`;
+}
+async function buy(provider){
+  try{
+    const r=await fetch(`/api/cabinet/${token}/buy`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider})});
+    const d=await r.json();
+    if(d.url) location.href=d.url; else toast(d.message||'Ошибка оплаты');
+  }catch{ toast('Ошибка оплаты'); }
+}
+load();
+</script>
+</body>
+</html>

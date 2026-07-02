@@ -19,7 +19,11 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   // публичные роуты без /api: подписка клиента и install-артефакты ноды
   app.setGlobalPrefix('api', {
-    exclude: ['install-node.sh', 'install/vpanel-agent', 'sub/:token', 'sub/:token/xray'],
+    exclude: [
+      'install-node.sh', 'install/vpanel-agent',
+      'sub/:token', 'sub/:token/xray',
+      'cabinet/:token', // страница кабинета (данные — под /api/cabinet/:token/data)
+    ],
   });
   await app.listen(Number(process.env.API_PORT) || 3000);
 }

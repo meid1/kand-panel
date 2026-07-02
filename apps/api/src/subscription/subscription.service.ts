@@ -15,7 +15,7 @@ export class SubscriptionService {
 
   private async support(): Promise<string> {
     const s = await this.prisma.setting.findUnique({ where: { key: 'support' } });
-    return s?.value || '@support';
+    return s?.value || '@marius_support';
   }
 
   /** Ссылка одного инбаунда ноды для устройства. */

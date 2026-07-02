@@ -84,3 +84,7 @@ cd /opt/kand && git pull && docker compose -f infra/docker-compose.prod.yml up -
 - Логи панели: `docker compose -f infra/docker-compose.prod.yml logs -f api`
 - Нода не подключилась: на ноде `journalctl -u kand-agent -u xray -n 50`
 - Клиенту «Лимит обхода исчерпан» после переноса — сбрось счётчик (см. migration.md).
+
+## 💬 Помощь с установкой
+Не хочешь разбираться сам — поможем поднять Kand и перенести клиентов.
+Пиши в Telegram **[@marius_support](https://t.me/marius_support)**.

@@ -322,8 +322,16 @@ export class BotService implements OnModuleInit {
     await tg.sendMessage(this.token, chatId, 'Способ оплаты:', buttons);
   }
 
+  // защита от двойного нажатия по «оплатить» (спам-тапы не плодят счета)
+  private lastPay = new Map<number, number>();
+
   // provider ИЛИ {provider, planId} (для тарифа)
   private async createInvoice(chatId: number, user: any, provider: string, planId?: string) {
+    const now = Date.now();
+    if (now - (this.lastPay.get(chatId) || 0) < 5000) {
+      return tg.sendMessage(this.token, chatId, '⏳ Счёт уже создаётся, подождите пару секунд…');
+    }
+    this.lastPay.set(chatId, now);
     try {
       let inv: any, label: string;
       if (planId) {

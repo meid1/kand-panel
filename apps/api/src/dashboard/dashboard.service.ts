@@ -70,7 +70,7 @@ export class DashboardService {
 
     return {
       users: { total, active, trial, blocked, newDay, newWeek },
-      nodes: { total, online: nodesOnline },
+      nodes: { total: nodes, online: nodesOnline },
       devices,
       revenue: { day: revDay, week: revWeek, month: revMonth, total: revTotal },
       chart,

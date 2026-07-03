@@ -23,6 +23,7 @@ import { AuditModule } from './audit/audit.module';
 import { BypassModule } from './bypass/bypass.module';
 import { BotModule } from './bot/bot.module';
 import { CabinetModule } from './cabinet/cabinet.module';
+import { ReferralModule } from './referral/referral.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { CabinetModule } from './cabinet/cabinet.module';
     BypassModule,
     BotModule,
     CabinetModule,
+    ReferralModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

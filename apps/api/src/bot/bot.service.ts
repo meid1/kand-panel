@@ -5,6 +5,7 @@ import { UsersService } from '../users/users.service';
 import { DevicesService } from '../devices/devices.service';
 import { PaymentsService } from '../payments/payments.service';
 import { BypassService } from '../bypass/bypass.service';
+import { ReferralService } from '../referral/referral.service';
 import { tg, InlineButton } from './telegram';
 
 /**
@@ -27,12 +28,23 @@ export class BotService implements OnModuleInit {
     private devices: DevicesService,
     private payments: PaymentsService,
     private bypass: BypassService,
+    private referral: ReferralService,
   ) {}
 
   async onModuleInit() {
     const s = await this.prisma.setting.findUnique({ where: { key: 'bot.token' } });
     this.token = s?.value || process.env.BOT_TOKEN || '';
     if (!this.token) { this.log.log('bot.token не задан — клиентский бот не запущен'); return; }
+    // узнаём username бота (для реф-ссылок) и сохраняем в настройки
+    try {
+      const me = await tg.getMe(this.token);
+      if (me?.result?.username) {
+        await this.prisma.setting.upsert({
+          where: { key: 'bot.username' }, update: { value: me.result.username },
+          create: { key: 'bot.username', value: me.result.username },
+        });
+      }
+    } catch { /* getMe не критичен */ }
     this.running = true;
     this.loop().catch((e) => this.log.error(`бот упал: ${e.message || e}`));
     this.log.log('клиентский бот запущен (polling)');
@@ -68,7 +80,8 @@ export class BotService implements OnModuleInit {
     return [
       [await b('btn.connect', 'connect')],
       [await b('btn.account', 'account'), await b('btn.buy', 'buy')],
-      [await b('btn.trial', 'trial'), await b('btn.support', 'support')],
+      [await b('btn.trial', 'trial'), await b('btn.referral', 'referral')],
+      [await b('btn.support', 'support')],
     ];
   }
 
@@ -84,8 +97,11 @@ export class BotService implements OnModuleInit {
 
   private async onMessage(msg: any) {
     const from = msg.from;
-    await this.users.ensure(from.id, { username: from.username, name: [from.first_name, from.last_name].filter(Boolean).join(' ') });
+    const { user, isNew } = await this.users.ensure(from.id, { username: from.username, name: [from.first_name, from.last_name].filter(Boolean).join(' ') });
     if (msg.text.startsWith('/start') || msg.text.startsWith('/menu')) {
+      // реф-ссылка: /start ref_<code> → привязать пригласившего (только для новых)
+      const m = msg.text.match(/\/start\s+ref_(\w+)/);
+      if (m && isNew) await this.referral.link(user.id, m[1]).catch(() => {});
       const welcome = await this.subst(await this.settings.getText('text.welcome'));
       await tg.sendMessage(this.token, msg.chat.id, welcome, await this.menu());
     } else {
@@ -108,6 +124,18 @@ export class BotService implements OnModuleInit {
     }
     if (data === 'buy') return this.sendBuyMenu(chatId);
     if (data.startsWith('buy:')) return this.createInvoice(chatId, user, data.slice(4));
+    if (data === 'referral') return this.sendReferral(chatId, user);
+  }
+
+  private async sendReferral(chatId: number, user: any) {
+    const r = await this.referral.stats(user.id);
+    const rewardS = await this.prisma.setting.findUnique({ where: { key: 'referral.reward_days' } });
+    const reward = rewardS ? Number(rewardS.value) || 0 : 0;
+    const rewardLine = reward > 0 ? `\nЗа каждого друга, который оплатит, ты получишь <b>${reward} дн.</b>` : '';
+    await tg.sendMessage(this.token, chatId,
+      `🤝 <b>Приглашай друзей</b>${rewardLine}\n\n` +
+      `Приглашено: <b>${r.invited}</b> · оплатили: <b>${r.paid}</b> · заработано: <b>${r.earnedDays} дн.</b>\n\n` +
+      `Твоя ссылка:\n<code>${r.link}</code>`, await this.menu());
   }
 
   // ── экраны ──────────────────────────────────────────────────────────────────

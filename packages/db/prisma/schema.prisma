@@ -38,6 +38,10 @@ model User {
   externalId   String?  // id исходной системы при импорте (напр. "cat_12345") — для дедупа/маппинга
   tgUsername   String?
   tgName       String?
+  referralCode String?  @unique // личный код-приглашение (для реф-ссылки)
+  referrerId   String?  // кто пригласил (User.id того же тенанта)
+  refEarnedDays Int     @default(0) // сколько дней заработано на рефералах
+  refFirstPay  Boolean  @default(false) // была ли уже первая оплата (чтобы наградить пригласившего 1 раз)
   expireAt     DateTime?
   isTrial      Boolean  @default(true)
   trialUsed    Boolean  @default(false)

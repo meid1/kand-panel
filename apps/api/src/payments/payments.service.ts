@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { ProviderRegistry } from './providers/provider.registry';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
+import { ReferralService } from '../referral/referral.service';
 
 /**
  * Оркестрация оплаты поверх реестра провайдеров. Единый путь:
@@ -17,6 +18,7 @@ export class PaymentsService {
     private prisma: PrismaService,
     private registry: ProviderRegistry,
     private users: UsersService,
+    private referral: ReferralService,
   ) {}
 
   async createInvoice(dto: CreateInvoiceDto) {
@@ -80,13 +82,18 @@ export class PaymentsService {
       payment = await this.prisma.payment.findFirst({ where: { invoiceId: res.externalId } });
     if (!payment) return { ok: true, note: 'платёж не найден (игнор)' };
 
-    if (payment.status === 'paid') return { ok: true, note: 'уже оплачен' }; // идемпотентность
+    if (payment.status === 'paid') return { ok: true, note: 'уже оплачен' }; // быстрый выход
 
     if (res.status === 'paid') {
-      await this.prisma.payment.update({
-        where: { id: payment.id }, data: { status: 'paid', paidAt: new Date() },
+      // АТОМАРНО: только один вебхук переведёт pending→paid и начислит (защита
+      // от двойного начисления при гонке/повторных вебхуках). count=0 → уже засчитан.
+      const flip = await this.prisma.payment.updateMany({
+        where: { id: payment.id, status: { not: 'paid' } },
+        data: { status: 'paid', paidAt: new Date() },
       });
+      if (flip.count === 0) return { ok: true, note: 'уже оплачен (гонка)' };
       if (payment.days) await this.users.grantDays(payment.userId, payment.days);
+      await this.referral.rewardOnFirstPayment(payment.userId); // реф-бонус за 1-ю оплату
       this.log.log(`оплата ${payment.id} (${providerId}) → +${payment.days} дн.`);
       return { ok: true, granted: payment.days };
     }

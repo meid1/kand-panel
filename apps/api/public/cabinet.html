@@ -51,6 +51,7 @@ const token = location.pathname.split('/')[2] || '';
 const $ = (id) => document.getElementById(id);
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2200);}
 function copy(s){navigator.clipboard?.writeText(s).then(()=>toast('Скопировано'),()=>toast(s));}
+function toggleQr(i){const el=document.getElementById('qr'+i);if(el)el.style.display=el.style.display==='none'?'block':'none';}
 const esc=(s)=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 async function load(){
@@ -69,11 +70,16 @@ async function load(){
        <div class="bar"><i style="width:${usedPct}%"></i></div>
        <div class="sub">${(bp.remainingGb??0).toFixed(1)} ГБ осталось из ${(bp.capGb??0).toFixed(1)}</div>`;
 
-  const devs = (d.devices||[]).map(dev=>`
+  const devs = (d.devices||[]).map((dev,i)=>`
     <div class="dev">
       <div class="nm">${esc(dev.name)}</div>
       <button class="btn ghost sm" onclick="copy('${esc(dev.sub)}')">Ссылка</button>
       <button class="btn sm" onclick="copy('${esc(dev.smart)}')">Умная</button>
+      <button class="btn ghost sm" onclick="toggleQr(${i})">QR</button>
+    </div>
+    <div id="qr${i}" style="display:none;text-align:center;padding:10px 0">
+      <img src="/api/cabinet/${token}/qr/${i}" width="200" height="200" style="background:#fff;border-radius:12px;padding:8px"/>
+      <div class="mut" style="font-size:12px;margin-top:6px">Отсканируйте в приложении</div>
     </div>`).join('') || '<div class="mut center">нет устройств</div>';
 
   const pays = (d.payMethods||[]).map(m=>`<button class="btn ghost" onclick="buy('${m.id}')">${esc(m.title)}</button>`).join('')

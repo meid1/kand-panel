@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, Header, Param, Post, Res } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { createReadStream, existsSync } from 'fs';
@@ -31,5 +31,12 @@ export class CabinetController {
   @Post('cabinet/:token/buy')
   buy(@Param('token') token: string, @Body('provider') provider: string) {
     return this.cabinet.buy(token, provider);
+  }
+
+  // QR умной ссылки устройства (SVG) — вне /api, чтобы <img> грузился напрямую
+  @Get('cabinet/:token/qr/:idx')
+  @Header('Content-Type', 'image/svg+xml')
+  async qr(@Param('token') token: string, @Param('idx') idx: string) {
+    return this.cabinet.qr(token, Number(idx) || 0);
   }
 }

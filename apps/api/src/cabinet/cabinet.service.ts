@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import * as QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
 import { BypassService } from '../bypass/bypass.service';
 import { PaymentsService } from '../payments/payments.service';
@@ -54,6 +55,16 @@ export class CabinetService {
       })),
       payMethods: methods,
     };
+  }
+
+  /** QR-код (SVG) умной ссылки устройства — для сканирования в приложение. */
+  async qr(token: string, idx: number): Promise<string> {
+    const user = await this.resolve(token);
+    const devices = await this.prisma.device.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'asc' } });
+    const d = devices[idx] || devices[0];
+    if (!d) throw new NotFoundException('устройство не найдено');
+    const link = `${this.base()}/sub/${d.subToken}/xray`;
+    return QRCode.toString(link, { type: 'svg', margin: 1, color: { dark: '#0b1220', light: '#ffffff' } });
   }
 
   /** Создать счёт на продление (клиент выбрал платёжку). */

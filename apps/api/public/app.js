@@ -1,5 +1,5 @@
 // Kand admin — vanilla JS, без сборки. Работает на статике, ходит в /api с JWT.
-const APP_VERSION = 'v0.13.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
+const APP_VERSION = 'v0.14.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
 const API = '/api';
 let TOKEN = localStorage.getItem('vp_token') || '';
 // показать версию (шапка + вход)
@@ -58,7 +58,35 @@ async function showApp() {
       document.querySelectorAll(`nav button[data-tab="${t}"]`).forEach((b) => { b.style.display = 'none'; });
     });
   } catch (e) { /* норм */ }
+  initNavIcons();
   switchTab('dashboard');
+}
+// чистые линейные SVG-иконки навигации (как в MariusVPN), stroke=currentColor
+const NAV_ICONS = (() => {
+  const w = (p) => `<svg class="nic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  return {
+    dashboard: w('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
+    users: w('<circle cx="9" cy="8" r="3"/><path d="M3.5 20c0-3 2.7-5 5.5-5s5.5 2 5.5 5"/><path d="M16 6a3 3 0 0 1 0 6"/><path d="M16.5 15c2.3.3 4 2 4 5"/>'),
+    txns: w('<rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/>'),
+    payments: w('<rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/><path d="M6 15h4"/>'),
+    finance: w('<path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v0"/><rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="16" cy="13.5" r="1.3"/>'),
+    nodes: w('<rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/>'),
+    traffic: w('<path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/>'),
+    hwid: w('<path d="M12 2.5l8.5 4.7v9.6L12 21.5 3.5 16.8V7.2z"/><path d="M12 21.5V12M3.7 7.2 12 12l8.3-4.8"/>'),
+    audit: w('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>'),
+    texts: w('<path d="M12 20h9"/><path d="M16.5 3.5a2 2 0 0 1 3 3L8 18l-4 1 1-4z"/>'),
+    plans: w('<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13V22"/>'),
+    promo: w('<path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2 2 2 0 0 0 0 6 2 2 0 0 1-2 2H5a2 2 0 0 1-2-2 2 2 0 0 0 0-6z"/><path d="M14 7v10"/>'),
+    broadcast: w('<path d="M22 2 11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>'),
+    tenants: w('<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 21v-4h6v4"/><path d="M8 7h.01M12 7h.01M16 7h.01M8 11h.01M12 11h.01M16 11h.01"/>'),
+    brand: w('<circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="10" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="15.5" cy="10" r="1"/><circle cx="10" cy="15" r="1"/>'),
+  };
+})();
+function initNavIcons() {
+  document.querySelectorAll('.side nav button').forEach((b) => {
+    const t = b.dataset.tab; const label = b.textContent.replace(/^[^\wА-Яа-я]+/, '').trim();
+    b.innerHTML = (NAV_ICONS[t] || '') + '<span>' + label + '</span>';
+  });
 }
 
 // ── tabs ─────────────────────────────────────────────────────────────────────
@@ -467,14 +495,15 @@ async function loadCdnNodes() {
     const r = await api('/bridge/nodes');
     if (!r.enabled || !r.nodes || !r.nodes.length) { box.innerHTML = ''; return; }
     window._cdnNodes = r.nodes;
-    box.innerHTML = '<div class="mut" style="font-size:12px;margin-bottom:6px">🟢 Живые серверы (внешний бэкенд). Порядок ↑↓ = очередь в подписке, имя = название у клиента.</div>'
-      + '<table><tr><th>#</th><th>Сервер</th><th>Хост</th><th>Протоколы</th><th></th></tr>'
-      + r.nodes.map((n, i) => `<tr><td style="white-space:nowrap"><button class="btn sec sm" ${i === 0 ? 'disabled' : ''} onclick="cdnMove(${i},-1)">↑</button> <button class="btn sec sm" ${i === r.nodes.length - 1 ? 'disabled' : ''} onclick="cdnMove(${i},1)">↓</button></td>`
-        + `<td>${esc(n.remark || '—')} ${n.hidden ? '<span class="pill bad">скрыт</span>' : '<span class="pill ok">показан</span>'}</td>`
-        + `<td class="mut">${esc(n.host || '')}${n.port ? ':' + n.port : ''}</td><td class="mut">${esc((n.protos || []).join(', '))}</td>`
-        + `<td class="row"><button class="btn sec sm" onclick='cdnRename(${i},${JSON.stringify(n.remark || '')})'>✏️ имя</button>`
-        + `<button class="btn sec sm" onclick="cdnToggle(${i},${!n.hidden})">${n.hidden ? '👁 показать' : '🙈 скрыть'}</button></td></tr>`).join('')
-      + '</table><div style="height:14px"></div>';
+    box.innerHTML = '<div class="row" style="justify-content:space-between;color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:0 4px 6px"><span>Сервер (как видит клиент) · хост</span><span>в подписке</span></div>'
+      + r.nodes.map((n, i) => `<div class="srv">`
+        + `<span style="display:flex;flex-direction:column;gap:2px"><button class="btn sec sm" ${i === 0 ? 'disabled' : ''} onclick="cdnMove(${i},-1)" style="padding:0 7px;line-height:1.5">↑</button><button class="btn sec sm" ${i === r.nodes.length - 1 ? 'disabled' : ''} onclick="cdnMove(${i},1)" style="padding:0 7px;line-height:1.5">↓</button></span>`
+        + `<span class="dot ${n.hidden ? 'off' : 'on'}"></span>`
+        + `<span class="name">${esc(n.remark || '—')} <button class="btn sec sm" onclick='cdnRename(${i},${JSON.stringify(n.remark || '')})' style="padding:2px 7px" title="переименовать">✏️</button></span>`
+        + `<span class="mut grow" style="font-size:13px">${esc(n.host || '')}${n.port ? ':' + n.port : ''} · ${esc((n.protos || []).join(', '))}</span>`
+        + `<button class="sw ${n.hidden ? '' : 'on'}" onclick="cdnToggle(${i},${!n.hidden})" title="${n.hidden ? 'скрыт из подписки' : 'показан в подписке'}"></button>`
+        + `</div>`).join('')
+      + '<div style="height:14px"></div>';
   } catch (e) { box.innerHTML = ''; }
 }
 async function cdnRename(idx, current) {

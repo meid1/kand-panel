@@ -30,6 +30,14 @@
   .side nav button{display:flex;align-items:center;gap:11px;text-align:left;background:transparent;border:0;color:var(--mut);padding:10px 12px;border-radius:10px;font-size:14px;width:100%}
   .side nav button:hover{background:#1a2233;color:var(--txt)}
   .side nav button.on{background:rgba(34,211,238,.12);color:var(--acc);font-weight:600}
+  .side nav button .nic{flex:none;opacity:.9} .side nav button.on .nic{opacity:1}
+  .srv{display:flex;align-items:center;gap:12px;padding:11px 4px;border-top:1px solid var(--line)}
+  .srv:first-child{border-top:0}
+  .srv .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .srv .dot.on{background:var(--ok);box-shadow:0 0 8px rgba(52,211,153,.5)} .srv .dot.off{background:#5b6b86}
+  .srv .name{background:#0e1626;border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:8px}
+  .sw{position:relative;width:42px;height:24px;border-radius:20px;background:#2a3550;border:0;cursor:pointer;transition:.15s;flex:none}
+  .sw.on{background:var(--acc)} .sw::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s} .sw.on::after{left:21px}
   .side-foot{padding-top:12px;margin-top:8px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
   main{flex:1;max-width:1120px;margin:0 auto;padding:24px;min-width:0}
   #burger{display:none}

@@ -245,6 +245,38 @@ export class NodesService {
     return { ok: true, pushed, error };
   }
 
+  /** Включить/выключить WARP на УЖЕ созданной ноде (регистрация ключа + пуш конфига). */
+  async setWarp(id: string, enable: boolean) {
+    const n = await this.prisma.node.findUnique({ where: { id } });
+    if (!n) throw new NotFoundException('нода не найдена');
+    const bundle = this.decodeBundle(n.secretKey);
+    const xray = bundle.xray || {};
+    xray.outbounds = xray.outbounds || [];
+    xray.routing = xray.routing || { rules: [] };
+    let warpKey = n.warpKey;
+
+    if (enable) {
+      if (!warpKey) {
+        warpKey = await this.warp.register();
+        if (!warpKey) throw new BadRequestException('не удалось зарегистрировать WARP (Cloudflare)');
+      }
+      if (!xray.outbounds.some((o: any) => o.tag === 'warp')) xray.outbounds.push(this.warp.outbound(warpKey));
+      if (!xray.routing.rules.some((r: any) => r.outboundTag === 'warp')) xray.routing.rules.push(this.warp.aiRule());
+    } else {
+      xray.outbounds = xray.outbounds.filter((o: any) => o.tag !== 'warp');
+      xray.routing.rules = xray.routing.rules.filter((r: any) => r.outboundTag !== 'warp');
+      warpKey = null;
+    }
+    bundle.xray = xray;
+    await this.prisma.node.update({
+      where: { id }, data: { warpKey, secretKey: Buffer.from(JSON.stringify(bundle)).toString('base64') },
+    });
+    let pushed = false, error: string | undefined;
+    try { await this.agent.setConfig(n.ip, bundle.agent_port || 8443, xray); await this.reconcile.reconcileNode(id); pushed = true; }
+    catch (e: any) { error = String(e.message || e); }
+    return { ok: true, warp: enable, pushed, error };
+  }
+
   /** Материалы для РУЧНОЙ установки ноды (админ ставит сам, без curl|bash). */
   async manual(id: string) {
     const n = await this.prisma.node.findUnique({ where: { id } });

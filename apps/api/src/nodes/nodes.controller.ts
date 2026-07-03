@@ -55,6 +55,12 @@ export class NodesController {
     return this.nodes.manual(id);
   }
 
+  // включить/выключить WARP на существующей ноде
+  @Post(':id/warp')
+  setWarp(@Param('id') id: string, @Body('enable') enable: boolean) {
+    return this.nodes.setWarp(id, !!enable);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.nodes.remove(id);

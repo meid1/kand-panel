@@ -80,7 +80,8 @@ RENDER.nodes = async function () {
     document.getElementById('n_list').innerHTML = nodes.length ? '<table><tr><th>Нода</th><th>Хост</th><th>Протоколы</th><th></th></tr>'
       + nodes.map((n) => `<tr><td>${esc(n.label)} ${n.isActive ? '<span class="pill ok">вкл</span>' : '<span class="pill bad">выкл</span>'} ${n.online ? '<span class="pill ok">online</span>' : ''}</td>`
         + `<td class="mut">${esc(n.address)}<br>${esc(n.ip)}</td><td class="mut">${(n.protocols || []).join(', ')}</td>`
-        + `<td class="row"><button class="btn sec sm" onclick="editCfg('${n.id}')">⚙ конфиг</button>`
+        + `<td class="row"><button class="btn sec sm" onclick="setWarp('${n.id}',${!n.warp})">${n.warp ? '🤖 WARP✓' : '🤖 WARP'}</button>`
+        + `<button class="btn sec sm" onclick="editCfg('${n.id}')">⚙ конфиг</button>`
         + `<button class="btn sec sm" onclick="manualNode('${n.id}')">🔧 ручная</button>`
         + `<button class="btn sec sm" onclick="toggleNode('${n.id}',${!n.isActive})">${n.isActive ? 'выкл' : 'вкл'}</button>`
         + `<button class="btn bad sm" onclick="delNode('${n.id}')">×</button></td></tr>`).join('') + '</table>'
@@ -134,6 +135,7 @@ async function addNode() {
   } catch (e) { toast(e.message); }
 }
 async function toggleNode(id, active) { try { await api('/nodes/' + id, { method: 'PATCH', body: JSON.stringify({ isActive: active }) }); RENDER.nodes(); } catch (e) { toast(e.message); } }
+async function setWarp(id, enable) { toast(enable ? 'включаю WARP…' : 'выключаю WARP…'); try { const r = await api('/nodes/' + id + '/warp', { method: 'POST', body: JSON.stringify({ enable }) }); toast(r.pushed ? 'WARP применён на сервере' : 'сохранено (сервер офлайн — применится позже)'); RENDER.nodes(); } catch (e) { toast(e.message); } }
 async function delNode(id) { if (!confirm('Удалить ноду?')) return; try { await api('/nodes/' + id, { method: 'DELETE' }); RENDER.nodes(); } catch (e) { toast(e.message); } }
 
 // ── КЛИЕНТЫ ──────────────────────────────────────────────────────────────────

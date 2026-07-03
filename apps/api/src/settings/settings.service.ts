@@ -71,6 +71,33 @@ export class SettingsService {
     return { ok: true, key, value: TEXTS_BY_KEY[key].default };
   }
 
+  // редактируемые флаги/значения (белый список — чтобы не писали произвольное)
+  private static FLAGS: Record<string, string> = {
+    'require_channel.enabled': 'Обязательная подписка на канал (вкл/выкл)',
+    'require_channel': 'Канал для обязательной подписки (@username или -100id)',
+    'terms.required': 'Требовать согласие с условиями (вкл/выкл)',
+    'referral.reward_days': 'Реферал: дней пригласившему за 1-ю оплату',
+    'referral.referee_days': 'Реферал: дней приглашённому за приход',
+    'trial.days': 'Пробный период, дней',
+    'plan.days': 'Тариф по умолчанию, дней (если нет тарифов)',
+    'plan.price': 'Тариф по умолчанию, цена',
+    'bypass.default_cap_gb': 'Лимит обхода по умолчанию, ГБ (0=безлимит)',
+    'bot.token': 'Токен клиентского бота',
+  };
+
+  /** Текущие значения всех редактируемых флагов (для формы админки). */
+  async flags() {
+    const rows = await this.prisma.setting.findMany({ where: { key: { in: Object.keys(SettingsService.FLAGS) } } });
+    const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    return Object.entries(SettingsService.FLAGS).map(([key, title]) => ({ key, title, value: map[key] ?? '' }));
+  }
+
+  async setFlag(key: string, value: string) {
+    if (!(key in SettingsService.FLAGS)) throw new BadRequestException('неизвестный флаг');
+    await this.put(key, value ?? '');
+    return { ok: true, key, value };
+  }
+
   /** Настройки платёжки: pay.<id>.enabled + pay.<id>.<field>. Читает ProviderRegistry. */
   async setPay(id: string, body: Record<string, any>) {
     await this.put(`pay.${id}.enabled`, body.enabled ? '1' : '0');

@@ -35,4 +35,7 @@ export const tg = {
     return call(token, 'answerCallbackQuery', { callback_query_id: id, ...(text ? { text } : {}) });
   },
   getMe(token: string) { return call(token, 'getMe', {}); },
+  getChatMember(token: string, chatId: string | number, userId: number) {
+    return call(token, 'getChatMember', { chat_id: chatId, user_id: userId });
+  },
 };

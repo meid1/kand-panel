@@ -322,12 +322,20 @@ RENDER.brand = async function () {
   const el = document.getElementById('tab-brand');
   try {
     const d = await api('/settings/texts');
+    const flags = await api('/settings/flags');
     el.innerHTML = '<div class="card"><b>Бренд</b><div class="mut">Подставляется в тексты вместо {brand}/{support}. Никакого хардкода.</div>'
       + `<label class="fld">Название бренда</label><input id="br_name" value="${esc(d.brand)}">`
       + `<label class="fld">Контакт поддержки</label><input id="br_sup" value="${esc(d.support)}">`
-      + '<div style="margin-top:10px"><button class="btn" onclick="saveBrand()">Сохранить</button></div></div>';
+      + '<div style="margin-top:10px"><button class="btn" onclick="saveBrand()">Сохранить бренд</button></div></div>'
+      + '<div class="card"><b>Настройки</b><div class="mut">Обязательная подписка, согласие, триал, реф-бонусы, токен бота. Тумблеры: 1=вкл, 0=выкл.</div>'
+      + flags.map(f => `<label class="fld">${esc(f.title)}</label><div class="row"><input id="fl_${esc(f.key)}" value="${esc(f.value)}" class="grow"><button class="btn sm" onclick="saveFlag('${esc(f.key)}')">OK</button></div>`).join('')
+      + '</div>';
   } catch (e) { el.innerHTML = '<div class="card">' + esc(e.message) + '</div>'; }
 };
+async function saveFlag(key) {
+  const v = document.getElementById('fl_' + key).value;
+  try { await api('/settings/flag/' + encodeURIComponent(key), { method: 'PUT', body: JSON.stringify({ value: v }) }); toast('сохранено'); } catch (e) { toast(e.message); }
+}
 async function saveBrand() {
   try { await api('/settings/brand', { method: 'PUT', body: JSON.stringify({ brand: document.getElementById('br_name').value, support: document.getElementById('br_sup').value }) }); toast('сохранено'); } catch (e) { toast(e.message); }
 }

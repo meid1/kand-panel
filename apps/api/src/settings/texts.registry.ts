@@ -31,6 +31,10 @@ export const TEXTS: TextDef[] = [
     default: 'Ваша подписка закончилась. Продлите доступ, чтобы снова пользоваться {brand}.' },
   { key: 'text.bypass_out', title: 'Лимит обхода закончился', kind: 'text',
     default: 'Лимит обхода израсходован. Докупить можно в боте {support}.' },
+  { key: 'text.terms', title: 'Условия / оферта', kind: 'text', premium: true,
+    default: 'Пользуясь {brand}, вы соглашаетесь с условиями сервиса. Мы не храним логи вашей активности.' },
+  { key: 'text.require_sub', title: 'Требование подписки на канал', kind: 'text',
+    default: 'Чтобы пользоваться {brand}, подпишитесь на наш канал, затем нажмите «Проверить».' },
   // — кнопки (без премиум-эмодзи по природе Telegram) —
   { key: 'btn.connect', title: 'Кнопка: Подключиться', kind: 'button', default: '🚀 Подключиться' },
   { key: 'btn.account', title: 'Кнопка: Личный кабинет', kind: 'button', default: '👤 Личный кабинет' },

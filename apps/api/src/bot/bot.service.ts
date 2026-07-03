@@ -97,6 +97,47 @@ export class BotService implements OnModuleInit {
     if (u.callback_query) return this.onCallback(u.callback_query);
   }
 
+  // проверка настройки-флага
+  private async flag(key: string): Promise<string> {
+    return (await this.prisma.setting.findUnique({ where: { key } }))?.value || '';
+  }
+  private on(v: string) { return v === '1' || v === 'true' || v === 'on'; }
+
+  /**
+   * Гейты доступа: согласие с условиями + обязательная подписка на канал.
+   * Возвращает true, если можно показывать контент; иначе сам шлёт нужный экран.
+   */
+  private async gates(chatId: number, user: any, tgUserId: number): Promise<boolean> {
+    // 1) согласие с условиями
+    if (this.on(await this.flag('terms.required')) && !user.agreedTerms) {
+      const terms = await this.subst(await this.settings.getText('text.terms'));
+      await tg.sendMessage(this.token, chatId, terms, [[{ text: '✅ Соглашаюсь', callback_data: 'agree' }]]);
+      return false;
+    }
+    // 2) обязательная подписка на канал
+    if (this.on(await this.flag('require_channel.enabled'))) {
+      const ch = await this.flag('require_channel');
+      if (ch) {
+        let member = false;
+        try {
+          const r = await tg.getChatMember(this.token, ch, tgUserId);
+          const st = r?.result?.status;
+          member = ['creator', 'administrator', 'member'].includes(st);
+        } catch { member = true; /* канал недоступен боту — не блокируем */ }
+        if (!member) {
+          const txt = await this.subst(await this.settings.getText('text.require_sub'));
+          const chLink = ch.startsWith('@') ? `https://t.me/${ch.slice(1)}` : undefined;
+          const btns: InlineButton[][] = [];
+          if (chLink) btns.push([{ text: '📢 Открыть канал', url: chLink }]);
+          btns.push([{ text: '🔄 Проверить', callback_data: 'checksub' }]);
+          await tg.sendMessage(this.token, chatId, txt, btns);
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   private async onMessage(msg: any) {
     const from = msg.from;
     const { user, isNew } = await this.users.ensure(from.id, { username: from.username, name: [from.first_name, from.last_name].filter(Boolean).join(' ') });
@@ -104,6 +145,7 @@ export class BotService implements OnModuleInit {
       // реф-ссылка: /start ref_<code> → привязать пригласившего (только для новых)
       const m = msg.text.match(/\/start\s+ref_(\w+)/);
       if (m && isNew) await this.referral.link(user.id, m[1]).catch(() => {});
+      if (!(await this.gates(msg.chat.id, user, from.id))) return;
       const welcome = await this.subst(await this.settings.getText('text.welcome'));
       await tg.sendMessage(this.token, msg.chat.id, welcome, await this.menu());
     } else {
@@ -117,6 +159,23 @@ export class BotService implements OnModuleInit {
     const data = cb.data as string;
     const { user } = await this.users.ensure(cb.from.id, { username: cb.from.username });
     await tg.answerCallback(this.token, cb.id);
+
+    // согласие с условиями
+    if (data === 'agree') {
+      await this.prisma.user.update({ where: { id: user.id }, data: { agreedTerms: true } });
+      const u2 = { ...user, agreedTerms: true };
+      if (!(await this.gates(chatId, u2, cb.from.id))) return;
+      const welcome = await this.subst(await this.settings.getText('text.welcome'));
+      return tg.sendMessage(this.token, chatId, welcome, await this.menu());
+    }
+    // повторная проверка обязательной подписки
+    if (data === 'checksub') {
+      if (!(await this.gates(chatId, user, cb.from.id))) return;
+      const welcome = await this.subst(await this.settings.getText('text.welcome'));
+      return tg.sendMessage(this.token, chatId, welcome, await this.menu());
+    }
+    // остальные действия — только после прохождения гейтов
+    if (!(await this.gates(chatId, user, cb.from.id))) return;
 
     if (data === 'connect') return this.sendSubscription(chatId, user);
     if (data === 'account') return this.sendAccount(chatId, user);

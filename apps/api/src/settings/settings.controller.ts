@@ -33,4 +33,13 @@ export class SettingsController {
   pay(@Param('id') id: string, @Body() body: Record<string, any>) {
     return this.settings.setPay(id, body);
   }
+
+  // редактируемые флаги/значения (обязательная подписка, согласие, триал, реф-бонусы…)
+  @Get('flags')
+  flags() { return this.settings.flags(); }
+
+  @Put('flag/:key')
+  setFlag(@Param('key') key: string, @Body('value') value: string) {
+    return this.settings.setFlag(key, value);
+  }
 }

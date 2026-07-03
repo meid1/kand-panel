@@ -42,6 +42,7 @@ model User {
   referrerId   String?  // кто пригласил (User.id того же тенанта)
   refEarnedDays Int     @default(0) // сколько дней заработано на рефералах
   refFirstPay  Boolean  @default(false) // была ли уже первая оплата (чтобы наградить пригласившего 1 раз)
+  agreedTerms  Boolean  @default(false) // согласие с условиями/офертой
   expireAt     DateTime?
   isTrial      Boolean  @default(true)
   trialUsed    Boolean  @default(false)

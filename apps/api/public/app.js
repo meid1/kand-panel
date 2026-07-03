@@ -348,9 +348,19 @@ RENDER.brand = async function () {
       + '<div style="margin-top:10px"><button class="btn" onclick="saveBrand()">Сохранить бренд</button></div></div>'
       + '<div class="card"><b>Настройки</b><div class="mut">Обязательная подписка, согласие, триал, реф-бонусы, токен бота. Тумблеры: 1=вкл, 0=выкл.</div>'
       + flags.map(f => `<label class="fld">${esc(f.title)}</label><div class="row"><input id="fl_${esc(f.key)}" value="${esc(f.value)}" class="grow"><button class="btn sm" onclick="saveFlag('${esc(f.key)}')">OK</button></div>`).join('')
-      + '</div>';
+      + '</div>'
+      + '<div class="card"><b>Маршрутизация — свои сайты</b><div class="mut">Добавь домены (по одному в строку). Применяется в умном конфиге. Напрямую = мимо VPN; Блок = не открывать; Через VPN = принудительно через сервер.</div>'
+      + `<label class="fld">Напрямую (мимо VPN)</label><textarea id="rt_direct" placeholder="example.ru\nmybank.ru"></textarea>`
+      + `<label class="fld">Блокировать</label><textarea id="rt_block" placeholder="ads.example.com"></textarea>`
+      + `<label class="fld">Через VPN (принудительно)</label><textarea id="rt_proxy" placeholder="instagram.com"></textarea>`
+      + '<div style="margin-top:8px"><button class="btn" onclick="saveRouting()">Сохранить маршрутизацию</button></div></div>';
+    try { const rt = await api('/settings/routing'); document.getElementById('rt_direct').value = rt.direct || ''; document.getElementById('rt_block').value = rt.block || ''; document.getElementById('rt_proxy').value = rt.proxy || ''; } catch (e) {}
   } catch (e) { el.innerHTML = '<div class="card">' + esc(e.message) + '</div>'; }
 };
+async function saveRouting() {
+  const body = { direct: document.getElementById('rt_direct').value, block: document.getElementById('rt_block').value, proxy: document.getElementById('rt_proxy').value };
+  try { await api('/settings/routing', { method: 'PUT', body: JSON.stringify(body) }); toast('маршрутизация сохранена'); } catch (e) { toast(e.message); }
+}
 async function saveFlag(key) {
   const v = document.getElementById('fl_' + key).value;
   try { await api('/settings/flag/' + encodeURIComponent(key), { method: 'PUT', body: JSON.stringify({ value: v }) }); toast('сохранено'); } catch (e) { toast(e.message); }

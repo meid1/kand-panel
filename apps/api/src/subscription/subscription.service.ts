@@ -18,6 +18,16 @@ export class SubscriptionService {
     return s?.value || '@marius_support';
   }
 
+  /** Кастомная маршрутизация (админ добавляет свои сайты): {direct[],block[],proxy[]}. */
+  private async customRouting(): Promise<{ direct: string[]; block: string[]; proxy: string[] }> {
+    const s = await this.prisma.setting.findUnique({ where: { key: 'routing.custom' } });
+    let raw: any = {}; try { raw = s ? JSON.parse(s.value) : {}; } catch { raw = {}; }
+    const norm = (arr: any) => (Array.isArray(arr) ? arr : String(arr || '').split(/[\s,]+/))
+      .map((d: string) => String(d).trim()).filter(Boolean)
+      .map((d: string) => (d.includes(':') ? d : `domain:${d}`)); // domain:example.com
+    return { direct: norm(raw.direct), block: norm(raw.block), proxy: norm(raw.proxy) };
+  }
+
   /** Ссылка одного инбаунда ноды для устройства. */
   private link(node: any, inbound: any, uuid: string, brand: string): string | null {
     const tag = `${brand} · ${node.label}`;
@@ -148,10 +158,15 @@ export class SubscriptionService {
 
     const rules: any[] = [
       { type: 'field', ip: ['geoip:private'], outboundTag: 'direct' },
-      // RU напрямую: домены РФ + IP РФ (банки, госуслуги, маркетплейсы)
-      { type: 'field', domain: ['geosite:category-ru', 'geosite:category-gov-ru'], outboundTag: 'direct' },
-      { type: 'field', ip: ['geoip:ru'], outboundTag: 'direct' },
     ];
+    // кастомные сайты админа (приоритетнее стандартных): блок / напрямую / через VPN
+    const custom = await this.customRouting();
+    if (custom.block.length) rules.push({ type: 'field', domain: custom.block, outboundTag: 'block' });
+    if (custom.direct.length) rules.push({ type: 'field', domain: custom.direct, outboundTag: 'direct' });
+    if (custom.proxy.length) rules.push({ type: 'field', domain: custom.proxy, outboundTag: defaultProxy });
+    // RU напрямую: домены РФ + IP РФ (банки, госуслуги, маркетплейсы)
+    rules.push({ type: 'field', domain: ['geosite:category-ru', 'geosite:category-gov-ru'], outboundTag: 'direct' });
+    rules.push({ type: 'field', ip: ['geoip:ru'], outboundTag: 'direct' });
     if (ytTag) {
       rules.push({ type: 'field',
         domain: ['geosite:youtube', 'domain:googlevideo.com', 'domain:ytimg.com', 'domain:ggpht.com'],

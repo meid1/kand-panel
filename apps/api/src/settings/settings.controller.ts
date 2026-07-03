@@ -43,6 +43,13 @@ export class SettingsController {
     return this.settings.setFlag(key, value);
   }
 
+  // кастомная маршрутизация (свои сайты → напрямую/блок/через VPN)
+  @Get('routing')
+  getRouting() { return this.settings.getRouting(); }
+
+  @Put('routing')
+  setRouting(@Body() body: any) { return this.settings.setRouting(body); }
+
   // кастомные кнопки бота
   @Get('buttons')
   getButtons() { return this.settings.getButtons(); }

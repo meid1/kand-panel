@@ -122,6 +122,17 @@ export class SettingsService {
     return { ok: true, buttons: clean };
   }
 
+  /** Кастомная маршрутизация: свои сайты → напрямую / блок / через VPN (для умного конфига). */
+  async getRouting() {
+    const raw = await this.raw('routing.custom');
+    try { return raw ? JSON.parse(raw) : { direct: '', block: '', proxy: '' }; } catch { return { direct: '', block: '', proxy: '' }; }
+  }
+  async setRouting(body: any) {
+    const clean = { direct: String(body?.direct || ''), block: String(body?.block || ''), proxy: String(body?.proxy || '') };
+    await this.put('routing.custom', JSON.stringify(clean));
+    return { ok: true };
+  }
+
   async setBrand(brand: string, support?: string) {
     if (brand) await this.put('brand', brand);
     if (support) await this.put('support', support);

@@ -155,11 +155,20 @@ model BypassUsage {
 model PromoCode {
   id        String   @id @default(cuid())
   code      String   @unique
-  type      String   // days | percent | bypass_gb
+  type      String   // days | bypass_gb | balance
   value     Float
   maxUses   Int      @default(1)
   usedCount Int      @default(0)
   createdAt DateTime @default(now())
+}
+
+/// Погашение промокода клиентом (защита от повторного использования одним юзером).
+model PromoRedemption {
+  id          String   @id @default(cuid())
+  promoCodeId String
+  userId      String
+  createdAt   DateTime @default(now())
+  @@unique([promoCodeId, userId])
 }
 
 /// Тариф (несколько на выбор: 1/3/6/12 мес, число устройств, цена).

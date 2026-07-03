@@ -8,6 +8,7 @@ import { BypassService } from '../bypass/bypass.service';
 import { ReferralService } from '../referral/referral.service';
 import { PlansService } from '../plans/plans.service';
 import { BroadcastService } from '../broadcast/broadcast.service';
+import { PromoService } from '../promo/promo.service';
 import { tg, InlineButton } from './telegram';
 
 /**
@@ -33,6 +34,7 @@ export class BotService implements OnModuleInit {
     private referral: ReferralService,
     private plans: PlansService,
     private broadcast: BroadcastService,
+    private promo: PromoService,
   ) {}
 
   // владелец в состоянии ввода (chatId → что вводит): welcome | broadcast
@@ -125,7 +127,7 @@ export class BotService implements OnModuleInit {
       [await b('btn.connect', 'connect')],
       [await b('btn.account', 'account'), await b('btn.buy', 'buy')],
       [await b('btn.trial', 'trial'), await b('btn.referral', 'referral')],
-      [await b('btn.support', 'support')],
+      [{ text: '🎁 Промокод', callback_data: 'promo' }, await b('btn.support', 'support')],
     ];
     // кастомные кнопки (создаёт админ): url → ссылка, text → показать текст
     const custom = await this.settings.getButtons();
@@ -189,8 +191,12 @@ export class BotService implements OnModuleInit {
   private async onMessage(msg: any) {
     const from = msg.from;
     const { user, isNew } = await this.users.ensure(from.id, { username: from.username, name: [from.first_name, from.last_name].filter(Boolean).join(' ') });
-    // владелец в режиме ввода (приветствие/рассылка) — перехватываем сообщение
-    if (this.awaiting.has(msg.chat.id) && await this.isOwner(from.id)) return this.captureOwnerInput(msg);
+    // режим ввода: промокод (любой юзер) или owner (приветствие/рассылка)
+    if (this.awaiting.has(msg.chat.id)) {
+      const st = this.awaiting.get(msg.chat.id);
+      if (st === 'promo') { this.awaiting.delete(msg.chat.id); return this.redeemPromo(msg.chat.id, user, msg.text.trim()); }
+      if (await this.isOwner(from.id)) return this.captureOwnerInput(msg);
+    }
     // вход в админку бота (только владелец)
     if ((msg.text === '/admin' || msg.text === '/owner') && await this.isOwner(from.id)) return this.ownerMenu(msg.chat.id);
     if (msg.text.startsWith('/start') || msg.text.startsWith('/menu')) {
@@ -246,6 +252,7 @@ export class BotService implements OnModuleInit {
     if (data.startsWith('pay:')) { const [, planId, provider] = data.split(':'); return this.createInvoice(chatId, user, provider, planId); }
     if (data.startsWith('buy:')) return this.createInvoice(chatId, user, data.slice(4));
     if (data === 'referral') return this.sendReferral(chatId, user);
+    if (data === 'promo') { this.awaiting.set(chatId, 'promo'); return tg.sendMessage(this.token, chatId, '🎁 Пришлите промокод одним сообщением:'); }
     // кастомная кнопка с действием «показать текст»
     if (data.startsWith('cbx:')) {
       const c = (await this.settings.getButtons())[+data.slice(4)];
@@ -262,6 +269,15 @@ export class BotService implements OnModuleInit {
       `🤝 <b>Приглашай друзей</b>${rewardLine}\n\n` +
       `Приглашено: <b>${r.invited}</b> · оплатили: <b>${r.paid}</b> · заработано: <b>${r.earnedDays} дн.</b>\n\n` +
       `Твоя ссылка:\n<code>${r.link}</code>`, await this.menu());
+  }
+
+  private async redeemPromo(chatId: number, user: any, code: string) {
+    try {
+      const r = await this.promo.redeem(user.id, code);
+      await tg.sendMessage(this.token, chatId, `✅ Промокод активирован: ${r.message}`, await this.menu());
+    } catch (e: any) {
+      await tg.sendMessage(this.token, chatId, `❌ ${e.message || 'не удалось активировать'}`, await this.menu());
+    }
   }
 
   // ── экраны ──────────────────────────────────────────────────────────────────

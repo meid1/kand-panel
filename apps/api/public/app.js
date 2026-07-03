@@ -266,6 +266,27 @@ async function addPlan() {
 async function togglePlan(id, active) { try { await api('/plans/' + id, { method: 'PATCH', body: JSON.stringify({ isActive: active }) }); RENDER.plans(); } catch (e) { toast(e.message); } }
 async function delPlan(id) { if (!confirm('Удалить тариф?')) return; try { await api('/plans/' + id, { method: 'DELETE' }); RENDER.plans(); } catch (e) { toast(e.message); } }
 
+// ── ПРОМОКОДЫ ────────────────────────────────────────────────────────────────
+RENDER.promo = async function () {
+  const el = document.getElementById('tab-promo');
+  el.innerHTML = '<div class="card"><b>Новый промокод</b>'
+    + '<div class="row"><input id="pm_code" placeholder="Код (WELCOME)" class="grow"><select id="pm_type"><option value="days">дни</option><option value="bypass_gb">ГБ обхода</option><option value="balance">баланс ₽</option></select><input id="pm_val" type="number" placeholder="значение" style="max-width:110px"><input id="pm_max" type="number" placeholder="исп." style="max-width:80px"></div>'
+    + '<div style="margin-top:8px"><button class="btn" onclick="addPromo()">Создать промокод</button></div></div>'
+    + '<div class="card"><b>Промокоды</b><div id="pm_list" class="mut">загрузка…</div></div>';
+  try {
+    const list = await api('/promo');
+    document.getElementById('pm_list').innerHTML = list.length ? '<table><tr><th>Код</th><th>Тип</th><th>Значение</th><th>Использовано</th><th></th></tr>'
+      + list.map(p => `<tr><td><code>${esc(p.code)}</code></td><td class="mut">${p.type}</td><td class="mut">${p.value}</td><td class="mut">${p.usedCount}/${p.maxUses}</td><td><button class="btn bad sm" onclick="delPromo('${p.id}')">×</button></td></tr>`).join('') + '</table>'
+      : '<span class="mut">нет промокодов</span>';
+  } catch (e) { document.getElementById('pm_list').textContent = e.message; }
+};
+async function addPromo() {
+  const body = { code: document.getElementById('pm_code').value.trim(), type: document.getElementById('pm_type').value, value: +document.getElementById('pm_val').value, maxUses: +document.getElementById('pm_max').value || 1 };
+  if (!body.code || !body.value) return toast('заполни код и значение');
+  try { await api('/promo', { method: 'POST', body: JSON.stringify(body) }); toast('промокод создан'); RENDER.promo(); } catch (e) { toast(e.message); }
+}
+async function delPromo(id) { if (!confirm('Удалить промокод?')) return; try { await api('/promo/' + id, { method: 'DELETE' }); RENDER.promo(); } catch (e) { toast(e.message); } }
+
 // ── ПЛАТЁЖКИ ─────────────────────────────────────────────────────────────────
 RENDER.payments = async function () {
   const el = document.getElementById('tab-payments');

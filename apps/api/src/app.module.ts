@@ -27,6 +27,7 @@ import { ReferralModule } from './referral/referral.module';
 import { DiagnosticsModule } from './diagnostics/diagnostics.module';
 import { PlansModule } from './plans/plans.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
+import { PromoModule } from './promo/promo.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { MonitoringModule } from './monitoring/monitoring.module';
     DiagnosticsModule,
     PlansModule,
     MonitoringModule,
+    PromoModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

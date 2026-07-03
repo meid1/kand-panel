@@ -107,4 +107,11 @@ export class UsersService {
     await this.findOne(id);
     return this.prisma.user.update({ where: { id }, data: { isBlocked: blocked } });
   }
+
+  /** Корректировка баланса (amount может быть отрицательным — списание). */
+  async adjustBalance(id: string, amount: number) {
+    await this.findOne(id);
+    const u = await this.prisma.user.update({ where: { id }, data: { balance: { increment: amount } } });
+    return { ok: true, balance: Number(u.balance) };
+  }
 }

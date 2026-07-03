@@ -40,7 +40,8 @@ export class PaymentsService {
       if (!plan) throw new BadRequestException('тариф не найден');
       amount = Number(plan.price); days = plan.days; description = description || plan.title;
     }
-    if (amount == null || days == null) throw new BadRequestException('нужен planId или amount+days');
+    if (dto.topup) { days = null as any; description = description || 'Пополнение баланса'; }
+    if (amount == null || (!dto.topup && days == null)) throw new BadRequestException('нужен planId, amount+days или topup');
 
     const payment = await this.prisma.payment.create({
       data: {
@@ -48,7 +49,8 @@ export class PaymentsService {
         userId: user.id,
         amount,
         method: dto.provider,
-        days,
+        days: days ?? null,
+        topup: !!dto.topup,
         status: 'pending',
         description,
       },
@@ -103,6 +105,12 @@ export class PaymentsService {
         data: { status: 'paid', paidAt: new Date() },
       });
       if (flip.count === 0) return { ok: true, note: 'уже оплачен (гонка)' };
+      if (payment.topup) {
+        // пополнение баланса
+        await this.prisma.user.update({ where: { id: payment.userId }, data: { balance: { increment: payment.amount } } });
+        this.log.log(`оплата ${payment.id} (${providerId}) → +${payment.amount} на баланс`);
+        return { ok: true, balance: Number(payment.amount) };
+      }
       if (payment.days) await this.users.grantDays(payment.userId, payment.days);
       await this.referral.rewardOnFirstPayment(payment.userId); // реф-бонус за 1-ю оплату
       this.log.log(`оплата ${payment.id} (${providerId}) → +${payment.days} дн.`);
@@ -114,6 +122,20 @@ export class PaymentsService {
       });
     }
     return { ok: true };
+  }
+
+  /** Оплата тарифа С БАЛАНСА (мгновенно, без платёжки). */
+  async payWithBalance(userId: string, planId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('пользователь не найден');
+    const plan = await this.plans.get(planId);
+    if (!plan) throw new BadRequestException('тариф не найден');
+    const price = Number(plan.price);
+    if (Number(user.balance) < price) throw new BadRequestException('недостаточно средств на балансе');
+    await this.prisma.user.update({ where: { id: userId }, data: { balance: { decrement: price } } });
+    await this.users.grantDays(userId, plan.days);
+    await this.referral.rewardOnFirstPayment(userId);
+    return { ok: true, days: plan.days, balance: Number(user.balance) - price };
   }
 
   async list(tenantId?: string) {

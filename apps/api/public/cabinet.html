@@ -121,6 +121,7 @@ async function load(){
         </div>
         <span class="badge ${d.active?'ok':'err'}">${d.active?'активна':'истекла'}</span>
       </div>
+      ${d.balance>0?`<div class="sub" style="margin-top:8px">💰 Баланс: <b style="color:var(--txt)">${d.balance}₽</b></div>`:''}
       <div style="margin-top:16px">${bypassBlock}</div>
     </div>
 

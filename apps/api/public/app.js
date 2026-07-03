@@ -163,6 +163,7 @@ async function openUser(id) {
       + `<div class="mut">tenant: ${u.tenant ? esc(u.tenant.brand) : '—'} · до ${u.expireAt ? new Date(u.expireAt).toLocaleString() : '—'}</div>`
       + '<div class="row" style="margin:10px 0"><input id="u_days" type="number" placeholder="дней (+/−)" style="max-width:140px">'
       + `<button class="btn sm" onclick="grantDays('${id}')">начислить/списать дни</button></div>`
+      + `<div class="row" style="margin:0 0 10px"><span class="mut">Баланс: <b>${Number(u.balance||0)}₽</b></span><input id="u_bal" type="number" placeholder="₽ (+/−)" style="max-width:120px"><button class="btn sm" onclick="adjBal('${id}')">изменить баланс</button></div>`
       + `<div class="mut" style="margin:6px 0">${esc(bpLine)}</div>`
       + '<div class="row" style="margin:0 0 10px"><input id="u_gb" type="number" placeholder="ГБ обхода" style="max-width:130px">'
       + `<button class="btn sm" onclick="bypassGb('${id}',true)">+ докупить</button>`
@@ -184,6 +185,11 @@ async function diagnose(id) {
 }
 async function fixUser(id) {
   try { const r = await api('/users/' + id + '/fix', { method: 'POST' }); toast('Починка: ' + r.reconciled); diagnose(id); } catch (e) { toast(e.message); }
+}
+async function adjBal(id) {
+  const amount = parseFloat(document.getElementById('u_bal').value);
+  if (!amount) return toast('введи сумму');
+  try { const r = await api('/users/' + id + '/balance', { method: 'POST', body: JSON.stringify({ amount }) }); toast('баланс: ' + r.balance + '₽'); openUser(id); } catch (e) { toast(e.message); }
 }
 async function bypassGb(id, add) {
   const gb = parseFloat(document.getElementById('u_gb').value);

@@ -248,8 +248,12 @@ export class BotService implements OnModuleInit {
       return tg.sendMessage(this.token, chatId, await this.subst(await this.settings.getText('text.help')));
     }
     if (data === 'buy') return this.sendBuyMenu(chatId, user);
-    if (data.startsWith('plan:')) return this.sendPayMethods(chatId, data.slice(5));
+    if (data.startsWith('plan:')) return this.sendPayMethods(chatId, data.slice(5), user);
     if (data.startsWith('pay:')) { const [, planId, provider] = data.split(':'); return this.createInvoice(chatId, user, provider, planId); }
+    if (data.startsWith('bal:')) {
+      try { const r = await this.payments.payWithBalance(user.id, data.slice(4)); return tg.sendMessage(this.token, chatId, `✅ Оплачено с баланса: +${r.days} дн. Остаток: ${r.balance}₽`, await this.menu()); }
+      catch (e: any) { return tg.sendMessage(this.token, chatId, `❌ ${e.message}`, await this.menu()); }
+    }
     if (data.startsWith('buy:')) return this.createInvoice(chatId, user, data.slice(4));
     if (data === 'referral') return this.sendReferral(chatId, user);
     if (data === 'promo') { this.awaiting.set(chatId, 'promo'); return tg.sendMessage(this.token, chatId, '🎁 Пришлите промокод одним сообщением:'); }
@@ -302,7 +306,9 @@ export class BotService implements OnModuleInit {
     const bypassLine = bp.unlimited ? 'Обход: безлимит'
       : `Обход: ${bp.remainingGb != null ? bp.remainingGb.toFixed(1) : '?'} ГБ осталось${bp.suspended ? ' (исчерпан)' : ''}`;
     const txt = await this.subst(await this.settings.getText('text.account'), { expire: exp });
-    await tg.sendMessage(this.token, chatId, `${txt}\n${bypassLine}`, await this.menu());
+    const bal = Number(user.balance || 0);
+    const balLine = bal > 0 ? `\n💰 Баланс: <b>${bal}₽</b>` : '';
+    await tg.sendMessage(this.token, chatId, `${txt}\n${bypassLine}${balLine}`, await this.menu());
   }
 
   private async sendTrial(chatId: number, user: any) {
@@ -331,10 +337,15 @@ export class BotService implements OnModuleInit {
     await tg.sendMessage(this.token, chatId, 'Выберите способ оплаты:', buttons);
   }
 
-  private async sendPayMethods(chatId: number, planId: string) {
+  private async sendPayMethods(chatId: number, planId: string, user?: any) {
     const methods = await this.payments.available();
-    if (!methods.length) return tg.sendMessage(this.token, chatId, 'Оплата временно недоступна.');
     const buttons = methods.map((m) => [{ text: m.title, callback_data: `pay:${planId}:${m.id}` }]);
+    // оплата с баланса, если хватает
+    const plan = await this.plans.get(planId);
+    if (user && plan && Number(user.balance || 0) >= Number(plan.price)) {
+      buttons.unshift([{ text: `💰 С баланса (${Number(user.balance)}₽)`, callback_data: `bal:${planId}` }]);
+    }
+    if (!buttons.length) return tg.sendMessage(this.token, chatId, 'Оплата временно недоступна.');
     await tg.sendMessage(this.token, chatId, 'Способ оплаты:', buttons);
   }
 

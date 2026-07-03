@@ -131,6 +131,7 @@ model Payment {
   status     String   @default("pending") // pending|paid|failed|refunded
   invoiceId  String?  // внешний id платежа у провайдера
   days       Int?     // сколько дней подписки начислить при успешной оплате
+  topup      Boolean  @default(false) // пополнение баланса (а не покупка подписки)
   description String?
   createdAt  DateTime @default(now())
   paidAt     DateTime?

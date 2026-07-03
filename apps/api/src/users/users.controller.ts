@@ -34,4 +34,10 @@ export class UsersController {
   block(@Param('id') id: string, @Body('blocked') blocked: boolean) {
     return this.users.setBlocked(id, blocked);
   }
+
+  // корректировка баланса (amount +/−)
+  @Post(':id/balance')
+  balance(@Param('id') id: string, @Body('amount') amount: number) {
+    return this.users.adjustBalance(id, Number(amount));
+  }
 }

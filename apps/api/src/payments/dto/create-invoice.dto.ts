@@ -1,4 +1,4 @@
-import { IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateInvoiceDto {
   @IsString() userId!: string;
@@ -10,4 +10,6 @@ export class CreateInvoiceDto {
   @IsOptional() @IsString() currency?: string;
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsString() returnUrl?: string;
+  // пополнение баланса (а не покупка подписки): начислит amount на кошелёк
+  @IsOptional() @IsBoolean() topup?: boolean;
 }

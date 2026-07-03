@@ -45,6 +45,7 @@ export class CabinetService {
     return {
       brand, accent,
       active,
+      balance: Number(user.balance || 0),
       expireAt: user.expireAt,
       daysLeft: user.expireAt ? Math.max(0, Math.ceil((user.expireAt.getTime() - now) / 86400000)) : null,
       bypass: bp,

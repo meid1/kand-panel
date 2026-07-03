@@ -29,6 +29,18 @@
   label.fld{display:block;margin:10px 0 2px;color:var(--mut);font-size:13px}
   code{background:#0c1119;padding:2px 6px;border-radius:6px;word-break:break-all}
   .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#0c1119;border:1px solid var(--line);padding:10px 16px;border-radius:10px}
+  /* мобильный: меню — одна прокручиваемая лента, а не блок на весь экран */
+  @media (max-width: 720px){
+    header{flex-wrap:wrap;gap:8px;padding:10px 12px}
+    header b{font-size:16px}
+    nav{order:3;width:100%;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    nav::-webkit-scrollbar{display:none}
+    nav button{flex:0 0 auto;white-space:nowrap;padding:6px 11px;font-size:13px}
+    main{padding:12px}
+    .card{padding:13px;border-radius:14px}
+    table{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+    input,select,textarea{font-size:16px}
+  }
 </style>
 </head>
 <body>

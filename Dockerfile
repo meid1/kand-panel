@@ -9,8 +9,13 @@ COPY agent/ ./
 RUN go build -o vpanel-agent ./...
 
 # ── этап 2: сборка и запуск API ──
-FROM node:20-alpine
+# node:20-slim (Debian), НЕ alpine: Prisma-движку нужен openssl/libssl (на alpine/musl
+# движок не грузится — "Could not parse schema engine response").
+FROM node:20-slim
 WORKDIR /app
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 COPY . .
 COPY --from=agent /a/vpanel-agent ./agent/vpanel-agent
 RUN npm install --no-audit --no-fund \

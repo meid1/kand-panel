@@ -1,5 +1,5 @@
 // Kand admin — vanilla JS, без сборки. Работает на статике, ходит в /api с JWT.
-const APP_VERSION = 'v0.17.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
+const APP_VERSION = 'v0.18.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
 const API = '/api';
 let TOKEN = localStorage.getItem('vp_token') || '';
 // показать версию (шапка + вход)
@@ -175,7 +175,7 @@ RENDER.dashboard = async function () {
       ? `<span class="pill ok">▲ +${h.momPct}% выручка к пред. мес.</span>`
       : `<span class="pill bad">▼ ${h.momPct}% выручка к пред. мес.</span>`;
     el.innerHTML =
-      `<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><b style="font-size:17px">Здоровье бизнеса</b>${mom}</div>`
+      `<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><b style="font-size:17px">Здоровье бизнеса</b><span class="row" style="gap:8px" id="sync_box">${mom}</span></div>`
       + '<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:14px">'
       + statCard('Выручка / 30 дн', money(h.revenueMonth), 'полученные оплаты', 'Реально полученные оплаты за последние 30 дней (оплата с баланса не считается повторно).')
       + statCard('Активных', h.active, 'действующих подписок', 'Клиенты с действующей подпиской прямо сейчас (не заблокированные, срок в будущем).')
@@ -217,8 +217,30 @@ RENDER.dashboard = async function () {
           + `<span class="mut">xray: ${x.xrayRunning ? '🟢 работает' : '🔴 стоп'}</span></div></div>`);
       }
     } catch (e) { /* моста нет — норм */ }
+    loadSyncStatus();
   } catch (e) { el.innerHTML = '<div class="mut">' + esc(e.message) + '</div>'; }
 };
+// индикатор свежести данных (синк из БД бота) + ручной запуск
+async function loadSyncStatus() {
+  const box = document.getElementById('sync_box'); if (!box) return;
+  try {
+    const s = await api('/sync/status');
+    if (!s.enabled) return; // синк не настроен — ничего не показываем
+    let label = 'ещё не запускался';
+    if (s.last && s.last.at) {
+      const mins = Math.round((Date.now() - new Date(s.last.at).getTime()) / 60000);
+      label = mins <= 0 ? 'только что' : (mins === 1 ? 'минуту назад' : mins + ' мин назад');
+    }
+    box.insertAdjacentHTML('afterbegin',
+      `<span class="pill ${s.running ? 'warn' : 'ok'}" title="Данные подтягиваются из БД бота каждые 3 мин">🔄 данные: ${s.running ? 'синхронизирую…' : label}</span>`
+      + `<button class="btn sec sm" onclick="syncNow(this)" ${s.running ? 'disabled' : ''}>Обновить</button>`);
+  } catch (e) { /* нет эндпоинта — норм */ }
+}
+async function syncNow(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'синхронизирую…'; }
+  try { const r = await api('/sync/catalyc', { method: 'POST' }); toast(r.skipped ? r.skipped : `обновлено: +${r.created || 0} клиентов, +${r.payments || 0} платежей`); RENDER.dashboard(); }
+  catch (e) { toast(e.message); if (btn) { btn.disabled = false; btn.textContent = 'Обновить'; } }
+}
 
 // ── ПЛАТЕЖИ (транзакции) ─────────────────────────────────────────────────────
 let P_SEARCH = '', P_STATUS = '', P_OFFSET = 0, _pT = null;

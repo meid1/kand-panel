@@ -100,7 +100,19 @@ npm --prefix apps/api run build && node apps/api/dist/main.js
 # админка: http://localhost:3000  (вход по ADMIN_PASSWORD)
 ```
 
-## Прод (docker-compose)
+## Установка одной командой (прод)
+На чистом сервере (Ubuntu/Debian) — ставит Docker, тянет код, генерит секреты, поднимает панель:
+```bash
+# по IP (быстрый старт):
+curl -fsSL https://raw.githubusercontent.com/meid1/kand-panel/main/install.sh | bash
+
+# по домену с авто-HTTPS (домен A-записью должен указывать на сервер):
+curl -fsSL https://raw.githubusercontent.com/meid1/kand-panel/main/install.sh | bash -s -- --domain vpn.example.com --https
+```
+В конце скрипт выведет адрес панели, логин и пароль. Повторный запуск = обновление (секреты сохраняются).
+Флаги: `--domain --https --port --password --bot-token --dir`. Скрипт: [`install.sh`](install.sh).
+
+### Или вручную (docker-compose)
 ```bash
 cp .env.example .env          # выставь секреты (ADMIN_PASSWORD, JWT_SECRET, PANEL_URL=https://<домен>)
 docker compose -f infra/docker-compose.prod.yml up -d --build

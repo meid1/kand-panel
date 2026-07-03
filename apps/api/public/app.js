@@ -252,6 +252,32 @@ async function delLedger(id) {
   try { await api('/finance/ledger/' + id, { method: 'DELETE' }); toast('удалено'); RENDER.finance(); } catch (e) { toast(e.message); }
 }
 
+// ── ТРАФИК ───────────────────────────────────────────────────────────────────
+RENDER.traffic = async function () {
+  const el = document.getElementById('tab-traffic'); el.innerHTML = '<div class="mut">загрузка…</div>';
+  const gb = (b) => (Number(b) / 1073741824).toFixed(2) + ' ГБ';
+  try {
+    const r = await api('/bridge/traffic-top');
+    if (!r.enabled) { el.innerHTML = '<div class="card"><b>Трафик</b><div class="mut" style="margin-top:6px">Данные о трафике приходят из внешнего бэкенда (мост не подключён). Для нод Kand трафик считается модулем статистики.</div></div>'; return; }
+    const top = r.top || [];
+    el.innerHTML = '<div class="card"><b>Топ по трафику</b><div class="mut" style="font-size:12px;margin:4px 0 8px">50 клиентов с наибольшим трафиком (из живого бэкенда)</div>'
+      + (top.length ? '<table><tr><th>#</th><th>Клиент</th><th>Всего</th><th>↑</th><th>↓</th></tr>'
+        + top.map((c, i) => `<tr><td class="mut">${i + 1}</td><td>${esc(c.email)} ${c.online ? '<span class="pill ok">online</span>' : ''}</td><td><b>${gb(c.total)}</b></td><td class="mut">${gb(c.up)}</td><td class="mut">${gb(c.down)}</td></tr>`).join('') + '</table>'
+        : '<div class="mut">нет данных</div>') + '</div>';
+  } catch (e) { el.innerHTML = '<div class="mut">' + esc(e.message) + '</div>'; }
+};
+// ── HWID ─────────────────────────────────────────────────────────────────────
+RENDER.hwid = async function () {
+  const el = document.getElementById('tab-hwid'); el.innerHTML = '<div class="mut">загрузка…</div>';
+  try {
+    const rows = await api('/users/hwid-top');
+    el.innerHTML = '<div class="card"><b>HWID — подозрительные</b><div class="mut" style="font-size:12px;margin:4px 0 8px">Клиенты с наибольшим числом устройств (возможный шеринг). Считается по подпискам, которые отдаёт Kand (заголовок x-hwid от приложений).</div>'
+      + (rows.length ? '<table><tr><th>Клиент</th><th>Устройств</th><th></th></tr>'
+        + rows.map((u) => `<tr><td>${esc(u.tgName || u.tgUsername || u.tgId)} ${u.isBlocked ? '<span class="pill bad">заблок</span>' : ''}</td><td><span class="pill">${u.hwidCount} HWID</span></td><td><button class="btn bad sm" onclick="toggleBlock('${u.id}',true)">🚫 Бан</button> <button class="btn sec sm" onclick="openUser('${u.id}')">открыть</button></td></tr>`).join('') + '</table>'
+        : '<div class="mut">подозрительных нет (или подписки идут через внешний бэкенд — тогда HWID считает он)</div>') + '</div>';
+  } catch (e) { el.innerHTML = '<div class="mut">' + esc(e.message) + '</div>'; }
+};
+
 // ── НОДЫ ─────────────────────────────────────────────────────────────────────
 const PROTOS = ['reality-tcp', 'reality-grpc', 'hysteria2', 'xhttp'];
 RENDER.nodes = async function () {

@@ -45,6 +45,12 @@ export class UsersController {
     return this.users.findAll({ tenantId, search, limit: Number(limit), offset: Number(offset) });
   }
 
+  // HWID: клиенты с наибольшим числом устройств (возможный шеринг) — до :id
+  @Get('hwid-top')
+  hwidTop() {
+    return this.users.hwidTop();
+  }
+
   @Get(':id')
   one(@Param('id') id: string) {
     return this.users.findOne(id);

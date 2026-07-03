@@ -181,6 +181,21 @@ export class UsersService {
     });
   }
 
+  /** HWID: клиенты с наибольшим числом устройств (возможный шеринг). */
+  async hwidTop() {
+    const rows = await this.prisma.userHwid.groupBy({
+      by: ['userId'], _count: { _all: true },
+      orderBy: { _count: { userId: 'desc' } }, take: 50,
+    });
+    if (!rows.length) return [];
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: rows.map((r) => r.userId) } },
+      select: { id: true, tgId: true, tgName: true, tgUsername: true, isBlocked: true },
+    });
+    const map = Object.fromEntries(users.map((u) => [u.id, u]));
+    return rows.map((r) => ({ ...(map[r.userId] || {}), hwidCount: r._count._all })).filter((x: any) => x.id);
+  }
+
   /** Корректировка баланса (amount может быть отрицательным — списание). */
   async adjustBalance(id: string, amount: number) {
     await this.findOne(id);

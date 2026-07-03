@@ -20,6 +20,12 @@ export class TenantsController {
     return this.tenants.findAll();
   }
 
+  // финансы/выплаты — до :id, иначе 'finance' попадёт в параметр
+  @Get('finance')
+  finance() {
+    return this.tenants.finance();
+  }
+
   @Get(':id')
   one(@Param('id') id: string) {
     return this.tenants.findOne(id);

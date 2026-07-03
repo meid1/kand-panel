@@ -449,7 +449,8 @@ RENDER.tenants = async function () {
     + '<div class="row"><input id="f_domain" placeholder="домен (опц.)" class="grow"><input id="f_owner" placeholder="Telegram id владельца (опц.)" class="grow"></div>'
     + '<div class="row"><input id="f_share" type="number" placeholder="доля франшизы %" class="grow"><input id="f_price" type="number" placeholder="цена/мес" class="grow"></div>'
     + '<div style="margin-top:8px"><button class="btn" onclick="addTenant()">Создать франшизу</button></div></div>'
-    + '<div class="card"><b>Франшизы</b><div id="f_list" class="mut">загрузка…</div></div>';
+    + '<div class="card"><b>Франшизы</b><div id="f_list" class="mut">загрузка…</div></div>'
+    + '<div class="card"><b>Финансы и выплаты</b><div id="f_finance" class="mut">загрузка…</div></div>';
   try {
     const list = await api('/tenants');
     document.getElementById('f_list').innerHTML = list.length ? '<table><tr><th>Бренд</th><th>Домен</th><th>Клиентов</th><th>Доля</th><th></th></tr>'
@@ -460,6 +461,20 @@ RENDER.tenants = async function () {
         + `<button class="btn bad sm" onclick="delTenant('${t.id}')">×</button></td></tr>`).join('') + '</table>'
       : '<span class="mut">франшиз нет (панель одиночная)</span>';
   } catch (e) { document.getElementById('f_list').textContent = e.message; }
+  // финансы/выплаты франшиз
+  try {
+    const f = await api('/tenants/finance');
+    const box = document.getElementById('f_finance');
+    if (!box) return;
+    const money = (v) => Number(v).toLocaleString('ru-RU') + '₽';
+    box.innerHTML = f.rows.length ? '<table><tr><th>Бренд</th><th>Клиентов</th><th>Получено</th><th>За 30д</th><th>Доля фр.</th><th>Франшизе</th><th>Платформе</th></tr>'
+      + f.rows.map((r) => `<tr><td>${esc(r.brand)}</td><td class="mut">${r.users}</td><td>${money(r.revenue)}</td>`
+        + `<td class="mut">${money(r.revenueMonth)}</td><td class="mut">${r.sharePercent}%</td>`
+        + `<td><b>${money(r.franchiseEarn)}</b></td><td class="mut">${money(r.platformEarn)}</td></tr>`).join('')
+      + `<tr><td colspan="5" style="text-align:right"><b>Итого к выплате:</b></td><td><b>${money(f.totals.franchise)}</b></td><td class="mut">${money(f.totals.platform)}</td></tr>`
+      + '</table><div class="mut" style="font-size:12px;margin-top:6px">«Франшизе» — сколько заработала франшиза со своей доли; «Платформе» — ваша часть. Оплата с баланса клиента не задваивает доход.</div>'
+      : '<span class="mut">нет данных</span>';
+  } catch (e) { /* тихо */ }
 };
 async function addTenant() {
   const body = {

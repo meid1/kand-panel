@@ -77,6 +77,43 @@ export class TenantsService {
     return { ok: true };
   }
 
+  /**
+   * Финансы франшиз (выплаты/доля). Для каждой франшизы: сколько денег получено
+   * (paid-платежи её тенанта), доля франшизы (sharePercent%) и доля платформы.
+   * Оплата с баланса не пишется в Payment → авто не задваивает доход.
+   */
+  async finance() {
+    const tenants = await this.prisma.tenant.findMany({
+      where: { kind: 'franchise' },
+      include: { _count: { select: { users: true, nodes: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const monthAgo = new Date(Date.now() - 30 * 86400_000);
+    const rows = [];
+    let totFranchise = 0, totPlatform = 0;
+    for (const t of tenants) {
+      const all = await this.prisma.payment.aggregate({
+        _sum: { amount: true }, where: { tenantId: t.id, status: 'paid' },
+      });
+      const month = await this.prisma.payment.aggregate({
+        _sum: { amount: true }, where: { tenantId: t.id, status: 'paid', paidAt: { gte: monthAgo } },
+      });
+      const revenue = Number(all._sum.amount || 0);
+      const revenueMonth = Number(month._sum.amount || 0);
+      const share = t.sharePercent ?? 50;
+      const franchiseEarn = Math.round(revenue * share / 100);
+      const platformEarn = revenue - franchiseEarn;
+      totFranchise += franchiseEarn; totPlatform += platformEarn;
+      rows.push({
+        id: t.id, brand: t.brand, domain: t.domain, isActive: t.isActive,
+        users: t._count.users, nodes: t._count.nodes,
+        sharePercent: share, revenue, revenueMonth,
+        franchiseEarn, platformEarn,
+      });
+    }
+    return { rows, totals: { franchise: totFranchise, platform: totPlatform } };
+  }
+
   /** Резолвер бренда по домену (для подписки/лендинга/бота на кастом-домене). */
   async byDomain(domain: string) {
     const d = (domain || '').toLowerCase().replace(/:\d+$/, '');

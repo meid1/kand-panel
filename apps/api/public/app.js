@@ -1,5 +1,5 @@
 // Kand admin — vanilla JS, без сборки. Работает на статике, ходит в /api с JWT.
-const APP_VERSION = 'v0.10.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
+const APP_VERSION = 'v0.11.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
 const API = '/api';
 let TOKEN = localStorage.getItem('vp_token') || '';
 // показать версию (шапка + вход)
@@ -498,27 +498,44 @@ async function moveNode(i, dir) {
 // ── КЛИЕНТЫ ──────────────────────────────────────────────────────────────────
 let U_SEARCH = '', U_OFFSET = 0, _uSearchT = null;
 const U_PAGE = 50;
+let U_STATUS = '';
 RENDER.users = async function () {
   const el = document.getElementById('tab-users');
-  el.innerHTML = '<div class="card"><div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b>Клиенты</b>'
-    + '<input id="u_search" placeholder="🔍 Поиск: имя / @username / ID" style="flex:1;min-width:200px;max-width:360px" oninput="onUserSearch(this.value)">'
+  el.innerHTML = '<div class="phead row" style="justify-content:space-between;align-items:flex-start"><div><h2>Клиенты</h2><div class="sub" id="u_count">…</div></div>'
     + '<button class="btn sm" onclick="createManualKey()">🔑 Создать ключ</button></div>'
-    + '<div id="u_list" class="mut">загрузка…</div><div id="u_pager" class="row" style="margin-top:8px;gap:10px;align-items:center"></div></div><div id="u_card"></div>';
-  U_OFFSET = 0; U_SEARCH = ''; loadUsers();
+    + '<div class="card"><div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">'
+    + '<input id="u_search" placeholder="🔍 Имя, @username, ID" style="flex:1;min-width:200px" oninput="onUserSearch(this.value)">'
+    + '<select id="u_stsel" style="max-width:170px" onchange="onUserStatus(this.value)"><option value="">Все статусы</option><option value="active">Активные</option><option value="expired">Истёкшие</option><option value="blocked">Заблокированные</option></select></div>'
+    + '<div id="u_list" class="mut" style="margin-top:10px">загрузка…</div><div id="u_pager" class="row" style="margin-top:10px;gap:10px;align-items:center"></div></div><div id="u_card"></div>';
+  U_OFFSET = 0; U_SEARCH = ''; U_STATUS = ''; loadUsers();
 };
 function onUserSearch(v) { U_SEARCH = v.trim(); U_OFFSET = 0; clearTimeout(_uSearchT); _uSearchT = setTimeout(loadUsers, 300); }
+function onUserStatus(v) { U_STATUS = v; U_OFFSET = 0; loadUsers(); }
 function pageUsers(d) { U_OFFSET = Math.max(0, U_OFFSET + d * U_PAGE); loadUsers(); }
 async function loadUsers() {
   const list = document.getElementById('u_list'); if (!list) return;
   try {
     const q = new URLSearchParams({ limit: U_PAGE, offset: U_OFFSET });
     if (U_SEARCH) q.set('search', U_SEARCH);
+    if (U_STATUS) q.set('status', U_STATUS);
     const r = await api('/users?' + q.toString());
     const rows = r.rows || r; const total = r.total != null ? r.total : rows.length;
-    list.innerHTML = rows.length ? '<table><tr><th>Клиент</th><th>Тариф до</th><th>Устройств</th><th></th></tr>'
-      + rows.map((u) => `<tr><td>${esc(u.tgName || u.tgUsername || u.tgId)} ${u.tenant && u.tenant.kind === 'franchise' ? '<span class="pill">' + esc(u.tenant.brand) + '</span>' : ''}</td>`
-        + `<td class="mut">${u.expireAt ? new Date(u.expireAt).toLocaleDateString() : '—'}</td><td class="mut">${(u.devices || []).length}</td>`
-        + `<td><button class="btn sec sm" onclick="openUser('${u.id}')">открыть</button></td></tr>`).join('') + '</table>'
+    const cnt = document.getElementById('u_count'); if (cnt) cnt.textContent = total.toLocaleString('ru-RU') + ' найдено';
+    const now = Date.now();
+    list.innerHTML = rows.length ? '<table><tr><th>Пользователь</th><th>TG-ID</th><th>Баланс</th><th>Подписка</th><th>Статус</th><th></th></tr>'
+      + rows.map((u) => {
+        const expMs = u.expireAt ? new Date(u.expireAt).getTime() : null;
+        const active = !u.isBlocked && expMs && expMs > now;
+        const dleft = expMs ? Math.ceil((expMs - now) / 86400000) : null;
+        const st = u.isBlocked ? '<span class="pill bad">заблок.</span>' : active ? '<span class="pill ok">активна</span>' : '<span class="pill warn">истекла</span>';
+        const sub = expMs
+          ? (active ? `<span style="color:var(--ok)">${dleft} дн.</span> <span class="mut">${new Date(expMs).toLocaleDateString()}</span>`
+            : `<span style="color:var(--bad)">истекла</span> <span class="mut">${new Date(expMs).toLocaleDateString()}</span>`)
+          : '<span class="mut">—</span>';
+        const badge = u.tenant && u.tenant.kind === 'franchise' ? ` <span class="pill brand">🤖 ${esc(u.tenant.brand)}</span>` : '';
+        return `<tr style="cursor:pointer" onclick="openUser('${u.id}')"><td><b>${esc(u.tgName || 'без имени')}</b>${u.tgUsername ? ` <span class="mut">@${esc(u.tgUsername)}</span>` : ''}${badge}</td>`
+          + `<td class="mut">${u.tgId}</td><td>${Number(u.balance || 0)}₽</td><td>${sub}</td><td>${st}</td><td class="mut" style="text-align:right;font-size:18px">›</td></tr>`;
+      }).join('') + '</table>'
       : '<span class="mut">ничего не найдено</span>';
     const pg = document.getElementById('u_pager');
     if (pg) {

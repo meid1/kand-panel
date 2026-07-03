@@ -79,9 +79,13 @@ export class UsersService {
    * Список клиентов с поиском и пагинацией (для админки с тысячами юзеров).
    * search — по имени/username/tgId/externalId. Возвращает {rows, total}.
    */
-  async findAll(opts: { tenantId?: string; search?: string; limit?: number; offset?: number } = {}) {
+  async findAll(opts: { tenantId?: string; search?: string; status?: string; limit?: number; offset?: number } = {}) {
     const where: any = {};
     if (opts.tenantId) where.tenantId = opts.tenantId;
+    const now = new Date();
+    if (opts.status === 'active') { where.isBlocked = false; where.expireAt = { gt: now }; }
+    else if (opts.status === 'expired') { where.isBlocked = false; where.AND = [{ OR: [{ expireAt: { lte: now } }, { expireAt: null }] }]; }
+    else if (opts.status === 'blocked') { where.isBlocked = true; }
     const s = (opts.search || '').trim();
     if (s) {
       const or: any[] = [

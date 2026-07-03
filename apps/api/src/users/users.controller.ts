@@ -39,10 +39,11 @@ export class UsersController {
   list(
     @Query('tenantId') tenantId?: string,
     @Query('search') search?: string,
+    @Query('status') status?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
-    return this.users.findAll({ tenantId, search, limit: Number(limit), offset: Number(offset) });
+    return this.users.findAll({ tenantId, search, status, limit: Number(limit), offset: Number(offset) });
   }
 
   // HWID: клиенты с наибольшим числом устройств (возможный шеринг) — до :id

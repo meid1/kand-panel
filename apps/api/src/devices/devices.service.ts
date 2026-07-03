@@ -26,8 +26,19 @@ export class DevicesService {
         name: name || 'Устройство',
         vlessUuid: randomUUID(),
         subToken: randomBytes(24).toString('hex'), // непубличный, длинный
+        tvCode: await this.genTvCode(), // короткий код для ТВ
       },
     });
+  }
+
+  // короткий код для ТВ: 8 символов без похожих (0/O, 1/I) — удобно вводить пультом
+  private async genTvCode(): Promise<string> {
+    const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    for (let t = 0; t < 6; t++) {
+      const c = Array.from(randomBytes(8)).map((b) => A[b % A.length]).join('');
+      if (!(await this.prisma.device.findUnique({ where: { tvCode: c } }))) return c;
+    }
+    return randomBytes(6).toString('hex').toUpperCase();
   }
 
   async listForUser(userId: string) {

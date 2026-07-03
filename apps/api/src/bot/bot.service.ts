@@ -260,9 +260,12 @@ export class BotService implements OnModuleInit {
     const base = this.panelUrl();
     const link = `${base}/sub/${device.subToken}`;
     const smart = `${base}/sub/${device.subToken}/xray`;
+    const tvLine = (device as any).tvCode
+      ? `\n📺 <b>Для телевизора</b> (Android TV): короткий адрес\n<code>${base}/t/${(device as any).tvCode}</code>\n`
+      : '';
     await tg.sendMessage(this.token, chatId,
       `Ваша ссылка-подписка:\n<code>${link}</code>\n\n` +
-      `Умный конфиг (RU напрямую, YouTube без рекламы):\n<code>${smart}</code>\n\n` +
+      `Умный конфиг (RU напрямую, YouTube без рекламы):\n<code>${smart}</code>\n${tvLine}\n` +
       `Добавьте ссылку в приложение (v2rayNG / Streisand / Hiddify).`);
   }
 

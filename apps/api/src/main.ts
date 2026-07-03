@@ -22,6 +22,7 @@ async function bootstrap() {
     exclude: [
       'install-node.sh', 'install/vpanel-agent',
       'sub/:token', 'sub/:token/xray',
+      't/:code', // короткий ТВ-роут подписки
       'cabinet/:token', // страница кабинета (данные — под /api/cabinet/:token/data)
     ],
   });

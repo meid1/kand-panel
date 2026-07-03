@@ -52,6 +52,7 @@ const $ = (id) => document.getElementById(id);
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2200);}
 function copy(s){navigator.clipboard?.writeText(s).then(()=>toast('Скопировано'),()=>toast(s));}
 function toggleQr(i){const el=document.getElementById('qr'+i);if(el)el.style.display=el.style.display==='none'?'block':'none';}
+function toggleTv(i){const el=document.getElementById('tv'+i);if(el)el.style.display=el.style.display==='none'?'block':'none';}
 const esc=(s)=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 async function load(){
@@ -76,11 +77,18 @@ async function load(){
       <button class="btn ghost sm" onclick="copy('${esc(dev.sub)}')">Ссылка</button>
       <button class="btn sm" onclick="copy('${esc(dev.smart)}')">Умная</button>
       <button class="btn ghost sm" onclick="toggleQr(${i})">QR</button>
+      ${dev.tv?`<button class="btn ghost sm" onclick="toggleTv(${i})">📺 ТВ</button>`:''}
     </div>
     <div id="qr${i}" style="display:none;text-align:center;padding:10px 0">
       <img src="/api/cabinet/${token}/qr/${i}" width="200" height="200" style="background:#fff;border-radius:12px;padding:8px"/>
       <div class="mut" style="font-size:12px;margin-top:6px">Отсканируйте в приложении</div>
-    </div>`).join('') || '<div class="mut center">нет устройств</div>';
+    </div>
+    ${dev.tv?`<div id="tv${i}" style="display:none;padding:10px 0">
+      <div class="mut" style="font-size:12px;margin-bottom:6px">На телевизоре (Android TV): установите v2rayNG/Hiddify, добавьте подписку по короткому адресу или коду:</div>
+      <div style="text-align:center;font-size:22px;font-weight:800;letter-spacing:2px">${esc(dev.tvCode)}</div>
+      <div class="mut" style="text-align:center;font-size:13px;margin-top:4px">${esc(dev.tv)}</div>
+      <button class="btn ghost sm block" onclick="copy('${esc(dev.tv)}')">Скопировать ТВ-ссылку</button>
+    </div>`:''}`).join('') || '<div class="mut center">нет устройств</div>';
 
   const pays = (d.payMethods||[]).map(m=>`<button class="btn ghost" onclick="buy('${m.id}')">${esc(m.title)}</button>`).join('')
     || '<div class="mut center" style="grid-column:1/3">оплата недоступна</div>';

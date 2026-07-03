@@ -66,6 +66,7 @@ model Device {
   name       String   @default("Устройство")
   vlessUuid  String   @unique
   subToken   String   @unique
+  tvCode     String?  @unique // короткий код для ТВ (легко ввести пультом): PANEL/t/<code>
   createdAt  DateTime @default(now())
   keySync    KeySyncStatus[]
 }

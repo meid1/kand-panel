@@ -52,6 +52,8 @@ export class CabinetService {
         name: d.name,
         sub: `${this.base()}/sub/${d.subToken}`,
         smart: `${this.base()}/sub/${d.subToken}/xray`,
+        tv: d.tvCode ? `${this.base()}/t/${d.tvCode}` : null, // короткая ссылка для ТВ
+        tvCode: d.tvCode,
       })),
       payMethods: methods,
     };

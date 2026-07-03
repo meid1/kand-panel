@@ -69,6 +69,13 @@ export class SubscriptionService {
     return { device, user, brand, nodes, blocked, bypassSuspended };
   }
 
+  /** subToken по короткому ТВ-коду (для /t/<code>). */
+  async tvToken(code: string): Promise<string> {
+    const d = await this.prisma.device.findUnique({ where: { tvCode: (code || '').toUpperCase() } });
+    if (!d) throw new NotFoundException('ТВ-код не найден');
+    return d.subToken;
+  }
+
   /** Возвращает {body(base64), expireUnix} для sub-токена (список vless/hy2 ссылок). */
   async build(token: string): Promise<{ body: string; expireUnix: number | null }> {
     const { device, user, brand, nodes, blocked, bypassSuspended } = await this.resolve(token);

@@ -30,3 +30,22 @@ export class SubscriptionController {
     return this.sub.buildXrayClientConfig(token);
   }
 }
+
+// Короткий ТВ-роут: /t/<код> (легко ввести пультом на телевизоре).
+@Throttle({ default: { limit: 30, ttl: 60000 } })
+@Controller('t')
+export class TvController {
+  constructor(private sub: SubscriptionService) {}
+
+  @Get(':code')
+  @Header('Content-Type', 'text/plain; charset=utf-8')
+  async get(@Param('code') code: string, @Res({ passthrough: true }) res: Response) {
+    const token = await this.sub.tvToken(code);
+    const { body, expireUnix } = await this.sub.build(token);
+    const info = ['upload=0', 'download=0', 'total=0'];
+    if (expireUnix) info.push(`expire=${expireUnix}`);
+    res.setHeader('subscription-userinfo', info.join('; '));
+    res.setHeader('profile-update-interval', '12');
+    return body;
+  }
+}

@@ -20,8 +20,20 @@ export class PaymentsController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  list(@Query('tenantId') tenantId?: string) {
-    return this.payments.list(tenantId);
+  list(
+    @Query('tenantId') tenantId?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.payments.list({ tenantId, search, status, limit: Number(limit), offset: Number(offset) });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/status')
+  setStatus(@Param('id') id: string, @Body('status') status: string) {
+    return this.payments.setStatus(id, status);
   }
 
   @UseGuards(JwtAuthGuard)

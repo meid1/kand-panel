@@ -114,6 +114,50 @@ RENDER.dashboard = async function () {
   } catch (e) { el.innerHTML = '<div class="mut">' + esc(e.message) + '</div>'; }
 };
 
+// ── ПЛАТЕЖИ (транзакции) ─────────────────────────────────────────────────────
+let P_SEARCH = '', P_STATUS = '', P_OFFSET = 0, _pT = null;
+const P_PAGE = 50;
+RENDER.txns = async function () {
+  const el = document.getElementById('tab-txns');
+  el.innerHTML = '<div class="card"><div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><b>Платежи</b>'
+    + '<input id="p_search" placeholder="🔍 клиент / способ / invoice" style="flex:1;min-width:180px;max-width:320px" oninput="onPaySearch(this.value)">'
+    + '<select id="p_status" onchange="onPayStatus(this.value)"><option value="">все статусы</option><option value="paid">оплачен</option><option value="pending">ожидает</option><option value="failed">неудача</option><option value="refunded">возврат</option><option value="granted">выдан(не доход)</option></select></div>'
+    + '<div id="p_list" class="mut">загрузка…</div><div id="p_pager" class="row" style="margin-top:8px;gap:10px;align-items:center"></div></div>';
+  P_OFFSET = 0; P_SEARCH = ''; P_STATUS = ''; loadTxns();
+};
+function onPaySearch(v) { P_SEARCH = v.trim(); P_OFFSET = 0; clearTimeout(_pT); _pT = setTimeout(loadTxns, 300); }
+function onPayStatus(v) { P_STATUS = v; P_OFFSET = 0; loadTxns(); }
+function pageTxns(d) { P_OFFSET = Math.max(0, P_OFFSET + d * P_PAGE); loadTxns(); }
+async function loadTxns() {
+  const list = document.getElementById('p_list'); if (!list) return;
+  const money = (v) => Number(v).toLocaleString('ru-RU') + '₽';
+  const badge = (s) => ({ paid: '<span class="pill ok">оплачен</span>', pending: '<span class="pill">ожидает</span>', failed: '<span class="pill bad">неудача</span>', refunded: '<span class="pill bad">возврат</span>', granted: '<span class="pill">выдан</span>' }[s] || esc(s));
+  try {
+    const q = new URLSearchParams({ limit: P_PAGE, offset: P_OFFSET });
+    if (P_SEARCH) q.set('search', P_SEARCH);
+    if (P_STATUS) q.set('status', P_STATUS);
+    const r = await api('/payments?' + q.toString());
+    const rows = r.rows || r; const total = r.total != null ? r.total : rows.length;
+    list.innerHTML = rows.length ? '<table><tr><th>Клиент</th><th>Сумма</th><th>Способ</th><th>Статус</th><th>Когда</th><th>Сменить</th></tr>'
+      + rows.map((p) => `<tr><td>${esc(p.user ? (p.user.tgName || p.user.tgUsername || p.user.tgId) : '—')}</td>`
+        + `<td>${money(p.amount)}</td><td class="mut">${esc(p.method)}</td><td>${badge(p.status)}</td>`
+        + `<td class="mut">${new Date(p.createdAt).toLocaleString()}</td>`
+        + `<td><select onchange="setPayStatus('${p.id}',this.value)"><option value="">—</option><option value="paid">оплачен</option><option value="pending">ожидает</option><option value="failed">неудача</option><option value="refunded">возврат</option><option value="granted">выдан</option></select></td></tr>`).join('') + '</table>'
+      : '<span class="mut">ничего не найдено</span>';
+    const pg = document.getElementById('p_pager');
+    if (pg) {
+      const from = total ? P_OFFSET + 1 : 0, to = Math.min(P_OFFSET + P_PAGE, total);
+      pg.innerHTML = `<span class="mut">${from}–${to} из ${total}</span>`
+        + (P_OFFSET > 0 ? '<button class="btn sec sm" onclick="pageTxns(-1)">← назад</button>' : '')
+        + (to < total ? '<button class="btn sec sm" onclick="pageTxns(1)">вперёд →</button>' : '');
+    }
+  } catch (e) { list.textContent = e.message; }
+}
+async function setPayStatus(id, status) {
+  if (!status) return;
+  try { await api('/payments/' + id + '/status', { method: 'POST', body: JSON.stringify({ status }) }); toast('статус изменён'); loadTxns(); } catch (e) { toast(e.message); }
+}
+
 // ── ФИНАНСЫ ──────────────────────────────────────────────────────────────────
 RENDER.finance = async function () {
   const el = document.getElementById('tab-finance');
@@ -360,6 +404,7 @@ async function openUser(id) {
       + `<button class="btn sec sm" onclick="bypassGb('${id}',false)">− списать</button>`
       + `<button class="btn sec sm" onclick="resetBypass('${id}')">↺ обнулить счётчик</button></div>`
       + `<div class="row" style="margin:0 0 10px"><span class="mut">Тумблер обхода:</span><button class="btn sec sm" onclick="toggleBypass('${id}',true)">🔥 С обходом</button><button class="btn sec sm" onclick="toggleBypass('${id}',false)">📶 Без обхода</button><button class="btn sec sm" onclick="forceEnable('${id}')">⚡ Принудительно включить ключ</button></div>`
+      + `<div class="row" style="margin:0 0 10px"><span class="mut">Ключ:</span><button class="btn sec sm" onclick="issueKey('${id}')">🔑 Выдать ключ</button><button class="btn bad sm" onclick="deleteKeyUser('${id}')">🗑 Удалить ключ</button></div>`
       + `<div style="margin:6px 0"><button class="btn sec sm" onclick="diagnose('${id}')">🩺 Диагностика</button><span id="diag_${id}" class="mut" style="margin-left:8px"></span></div>`
       + '<b class="mut">Устройства (подписки)</b><table>' + (devs || '<tr><td class="mut">нет</td></tr>') + '</table>'
       + `<button class="btn sec sm" style="margin-top:8px" onclick="addDevice('${id}')">+ устройство</button>`
@@ -411,6 +456,13 @@ async function toggleBypass(id, on) {
 }
 async function forceEnable(id) {
   try { await api('/users/' + id + '/force-enable', { method: 'POST' }); toast('ключ принудительно включён'); openUser(id); } catch (e) { toast(e.message); }
+}
+async function issueKey(id) {
+  try { await api('/users/' + id + '/issue-key', { method: 'POST' }); toast('ключ выдан'); openUser(id); } catch (e) { toast(e.message); }
+}
+async function deleteKeyUser(id) {
+  if (!confirm('Удалить ключ клиента во внешнем бэкенде? Доступ пропадёт.')) return;
+  try { await api('/users/' + id + '/delete-key', { method: 'POST' }); toast('ключ удалён'); openUser(id); } catch (e) { toast(e.message); }
 }
 async function delDevice(id, did) {
   if (!confirm('Удалить устройство? Его ссылка подписки перестанет работать.')) return;

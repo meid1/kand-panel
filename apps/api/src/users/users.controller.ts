@@ -66,6 +66,16 @@ export class UsersController {
     return this.users.forceEnable(id);
   }
 
+  @Post(':id/issue-key')
+  issueKey(@Param('id') id: string) {
+    return this.users.issueKey(id);
+  }
+
+  @Post(':id/delete-key')
+  deleteKey(@Param('id') id: string) {
+    return this.users.deleteKey(id);
+  }
+
   // корректировка баланса (amount +/−)
   @Post(':id/balance')
   balance(@Param('id') id: string, @Body('amount') amount: number) {

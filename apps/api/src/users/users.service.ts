@@ -150,6 +150,22 @@ export class UsersService {
     return { ok: true };
   }
 
+  /** Выдать ключ клиенту (создать во внешнем бэкенде). */
+  async issueKey(id: string) {
+    const u = await this.findOne(id);
+    if (!u.externalId) throw new BadRequestException('у клиента нет externalId');
+    const r = await this.bridge.createKey(u.externalId, u.tgId?.toString());
+    return { ok: true, result: r };
+  }
+
+  /** Удалить ключ клиента во внешнем бэкенде. */
+  async deleteKey(id: string) {
+    const u = await this.findOne(id);
+    if (!u.externalId) throw new BadRequestException('у клиента нет externalId');
+    await this.bridge.deleteKey(u.externalId);
+    return { ok: true };
+  }
+
   /** Ручное создание ключа (выдать кому-то без Telegram). tgId — уникальный отрицательный. */
   async createManual(name?: string, days?: number, tenantId?: string) {
     const tid = tenantId ?? (await this.platformTenantId());

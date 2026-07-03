@@ -54,4 +54,8 @@ export class BridgeService {
   deleteKey(email: string) {
     return this.safe(() => this.call('DELETE', `/v1/clients/by-email/${encodeURIComponent(email)}`), `delete ${email}`);
   }
+  /** Создать ключ во внешнем бэкенде (uuid/sub_id генерятся там). email = externalId. */
+  createKey(email: string, tgId?: string) {
+    return this.safe(() => this.call('POST', '/v1/clients', { email, tgId: tgId ? String(tgId) : '', hasBypass: true }), `create ${email}`);
+  }
 }

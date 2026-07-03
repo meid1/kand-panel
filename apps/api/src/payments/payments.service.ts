@@ -138,10 +138,40 @@ export class PaymentsService {
     return { ok: true, days: plan.days, balance: Number(user.balance) - price };
   }
 
-  async list(tenantId?: string) {
-    return this.prisma.payment.findMany({
-      where: tenantId ? { tenantId } : undefined,
-      orderBy: { createdAt: 'desc' }, take: 200,
+  async list(opts: { tenantId?: string; search?: string; status?: string; limit?: number; offset?: number } = {}) {
+    const where: any = {};
+    if (opts.tenantId) where.tenantId = opts.tenantId;
+    if (opts.status) where.status = opts.status;
+    const s = (opts.search || '').trim();
+    if (s) {
+      const or: any[] = [
+        { method: { contains: s, mode: 'insensitive' } },
+        { invoiceId: { contains: s, mode: 'insensitive' } },
+        { user: { is: { tgName: { contains: s, mode: 'insensitive' } } } },
+      ];
+      const digits = s.replace(/\D/g, '');
+      if (digits) { try { or.push({ user: { is: { tgId: BigInt(digits) } } }); } catch { /* */ } }
+      where.OR = or;
+    }
+    const take = Math.min(Math.max(Number(opts.limit) || 50, 1), 200);
+    const skip = Math.max(Number(opts.offset) || 0, 0);
+    const [rows, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        where, orderBy: { createdAt: 'desc' }, take, skip,
+        include: { user: { select: { tgName: true, tgUsername: true, tgId: true } } },
+      }),
+      this.prisma.payment.count({ where }),
+    ]);
+    return { rows, total, limit: take, offset: skip };
+  }
+
+  /** Сменить статус платежа (админ): paid | pending | failed | refunded | granted. */
+  async setStatus(id: string, status: string) {
+    const ok = ['paid', 'pending', 'failed', 'refunded', 'granted'];
+    if (!ok.includes(status)) throw new BadRequestException('статус: ' + ok.join(' | '));
+    return this.prisma.payment.update({
+      where: { id },
+      data: { status, ...(status === 'paid' ? { paidAt: new Date() } : {}) },
     });
   }
 

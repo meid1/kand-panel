@@ -10,7 +10,8 @@ export class BroadcastController {
   // старт: {text} ЛИБО {fromChatId, messageId} (копия — с премиум-эмодзи/медиа)
   @Post()
   start(@Body() body: {
-    text?: string; fromChatId?: number | string; messageId?: number; tenantId?: string;
+    text?: string; fromChatId?: number | string; messageId?: number;
+    tenantId?: string; testChatId?: number | string;
   }) {
     return this.broadcast.start(body);
   }

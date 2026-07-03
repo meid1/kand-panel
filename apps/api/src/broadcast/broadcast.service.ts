@@ -30,29 +30,37 @@ export class BroadcastService {
   status() { return this.state; }
 
   private async botToken(tenantId?: string): Promise<string> {
+    // Выделенный send-only токен: используется, когда бота ведёт ВНЕШНИЙ процесс
+    // (свой polling). Задание этого ключа НЕ запускает бота Kand → без конфликта
+    // getUpdates. Для рассылки достаточно отправлять — polling не нужен.
+    const bt = await this.prisma.setting.findUnique({ where: { key: 'broadcast.token' } });
+    if (bt?.value) return bt.value;
     if (tenantId) {
       const t = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
       if (t?.botToken) return t.botToken;
     }
     const s = await this.prisma.setting.findUnique({ where: { key: 'bot.token' } });
-    if (!s?.value) throw new BadRequestException('не задан токен бота (настройки bot.token или у тенанта)');
+    if (!s?.value) throw new BadRequestException('не задан токен бота (broadcast.token / bot.token / у тенанта)');
     return s.value;
   }
 
   /** Запуск рассылки в фоне. Возвращает {started,total} сразу. */
   async start(opts: {
     text?: string; fromChatId?: number | string; messageId?: number;
-    tenantId?: string;
+    tenantId?: string; testChatId?: number | string;
   }) {
     if (this.state.running) throw new BadRequestException('рассылка уже идёт');
     if (!opts.text && !(opts.fromChatId && opts.messageId))
       throw new BadRequestException('нужен text ИЛИ (fromChatId + messageId)');
 
     const token = await this.botToken(opts.tenantId);
-    const users = await this.prisma.user.findMany({
-      where: { isBlocked: false, ...(opts.tenantId ? { tenantId: opts.tenantId } : {}) },
-      select: { tgId: true },
-    });
+    // тест-режим: отправить только одному chatId (проверить перед массовой рассылкой)
+    const users = opts.testChatId
+      ? [{ tgId: BigInt(String(opts.testChatId).replace(/\D/g, '') || '0') }]
+      : await this.prisma.user.findMany({
+          where: { isBlocked: false, ...(opts.tenantId ? { tenantId: opts.tenantId } : {}) },
+          select: { tgId: true },
+        });
 
     this.state = {
       running: true, total: users.length, sent: 0, failed: 0,

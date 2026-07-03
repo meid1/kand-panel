@@ -439,8 +439,8 @@ async function openUser(id) {
         + `<td><button class="btn sec sm" onclick='copyText(${JSON.stringify(link)})'>📋 ссылка</button>`
         + ` <button class="btn bad sm" onclick="delDevice('${id}','${d.id}')">×</button></td></tr>`;
     }).join('');
-    document.getElementById('u_card').innerHTML = '<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><b>' + esc(u.tgName || u.tgUsername || u.tgId) + '</b>'
-      + `<button class="btn ${u.isBlocked ? '' : 'bad'} sm" onclick="toggleBlock('${id}',${!u.isBlocked})">${u.isBlocked ? '🔓 Разблокировать' : '🚫 Заблокировать'}</button></div>`
+    document.getElementById('u_card').innerHTML = '<div class="umodal" onclick="if(event.target===this)closeUser()"><div class="card umodal-box"><div class="row" style="justify-content:space-between;align-items:center"><b>' + esc(u.tgName || u.tgUsername || u.tgId) + '</b>'
+      + `<span class="row" style="gap:6px"><button class="btn ${u.isBlocked ? '' : 'bad'} sm" onclick="toggleBlock('${id}',${!u.isBlocked})">${u.isBlocked ? '🔓 Разблокировать' : '🚫 Заблокировать'}</button><button class="btn sec sm" onclick="closeUser()">✕</button></span></div>`
       + `<div class="mut">ID ${u.tgId} · тариф до ${u.expireAt ? new Date(u.expireAt).toLocaleString() : '—'}${u.isBlocked ? ' · <span class="pill bad">заблокирован</span>' : ''}</div>`
       + '<div class="row" style="margin:10px 0"><input id="u_days" type="number" placeholder="дней (+/−)" style="max-width:140px">'
       + `<button class="btn sm" onclick="grantDays('${id}')">начислить/списать дни</button></div>`
@@ -455,10 +455,11 @@ async function openUser(id) {
       + `<div style="margin:6px 0"><button class="btn sec sm" onclick="diagnose('${id}')">🩺 Диагностика</button><span id="diag_${id}" class="mut" style="margin-left:8px"></span></div>`
       + '<b class="mut">Устройства (подписки)</b><table>' + (devs || '<tr><td class="mut">нет</td></tr>') + '</table>'
       + `<button class="btn sec sm" style="margin-top:8px" onclick="addDevice('${id}')">+ устройство</button>`
-      + `<div id="hwids_${id}" class="mut" style="margin-top:10px"></div></div>`;
+      + `<div id="hwids_${id}" class="mut" style="margin-top:10px"></div></div></div>`;
     loadHwids(id);
   } catch (e) { toast(e.message); }
 }
+function closeUser() { const c = document.getElementById('u_card'); if (c) c.innerHTML = ''; }
 async function loadHwids(id) {
   try {
     const hw = await api('/users/' + id + '/hwids');

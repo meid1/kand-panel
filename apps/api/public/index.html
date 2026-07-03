@@ -35,7 +35,9 @@
   table{width:100%;border-collapse:collapse} td,th{text-align:left;padding:8px;border-bottom:1px solid var(--line);font-size:14px}
   label.fld{display:block;margin:10px 0 2px;color:var(--mut);font-size:13px}
   code{background:#0c1119;padding:2px 6px;border-radius:6px;word-break:break-all}
-  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#0c1119;border:1px solid var(--line);padding:10px 16px;border-radius:10px}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#0c1119;border:1px solid var(--line);padding:10px 16px;border-radius:10px;z-index:60}
+  .umodal{position:fixed;inset:0;background:rgba(3,7,18,.72);backdrop-filter:blur(2px);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:24px 14px;overflow:auto}
+  .umodal-box{max-width:600px;width:100%;max-height:90vh;overflow:auto;margin:0}
   /* мобильный: меню — одна прокручиваемая лента, а не блок на весь экран */
   @media (max-width: 820px){
     #app{display:block}

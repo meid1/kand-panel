@@ -44,15 +44,23 @@ export class DashboardService {
       revBetween(dayAgo), revBetween(weekAgo), revBetween(monthAgo), revBetween(), revBetween(twoMonthAgo, monthAgo),
     ]);
 
-    // уникальные плательщики (для LTV и воронки «оплатили»)
-    const payers = await this.prisma.payment.groupBy({ by: ['userId'], where: { ...T, status: 'paid' } });
-    const payingUsers = payers.length;
+    // уникальные плательщики: всего (LTV/воронка) и за 30 дн (ARPPU)
+    const [payersAll, payersMonth, activePayers, churnedPayers] = await Promise.all([
+      this.prisma.payment.groupBy({ by: ['userId'], where: { ...T, status: 'paid' } }),
+      this.prisma.payment.groupBy({ by: ['userId'], where: { ...T, status: 'paid', paidAt: { gte: monthAgo } } }),
+      // активные платящие (для базы оттока — считаем ТОЛЬКО тех, кто реально платил)
+      this.prisma.user.count({ where: { ...T, isBlocked: false, expireAt: { gt: now }, payments: { some: { status: 'paid' } } } }),
+      // ушли за 30 дн: платившие, у кого подписка кончилась в окне и НЕ активна
+      this.prisma.user.count({ where: { ...T, expireAt: { gte: monthAgo, lt: now }, payments: { some: { status: 'paid' } } } }),
+    ]);
+    const payingUsers = payersAll.length;         // всего платящих (за всё время)
+    const payingUsersMonth = payersMonth.length;  // платящих за 30 дн
 
     // здоровье бизнеса
-    const arpu = active ? Math.round(revMonth / active) : 0;                 // доход с активного клиента/мес
-    const ltv = payingUsers ? Math.round(revTotal / payingUsers) : 0;       // сколько принёс 1 плательщик всего
-    const churnBase = active + expiredMonth;
-    const churnPct = churnBase ? +(expiredMonth / churnBase * 100).toFixed(1) : 0;
+    const arppu = payingUsersMonth ? Math.round(revMonth / payingUsersMonth) : 0; // выручка/30дн ÷ платящих за 30дн
+    const ltv = payingUsers ? Math.round(revTotal / payingUsers) : 0;            // вся выручка ÷ всех платящих
+    const churnBase = activePayers + churnedPayers;
+    const churnPct = churnBase ? +(churnedPayers / churnBase * 100).toFixed(1) : 0;
     const momPct = revPrevMonth ? Math.round((revMonth - revPrevMonth) / revPrevMonth * 100) : (revMonth ? 100 : 0);
 
     // график: доход и регистрации по дням за 30 дней
@@ -81,7 +89,8 @@ export class DashboardService {
       nodes: { total: nodes, online: nodesOnline },
       devices,
       revenue: { day: revDay, week: revWeek, month: revMonth, total: revTotal },
-      health: { revenueMonth: revMonth, revenuePrevMonth: revPrevMonth, momPct, active, churnPct, arpu, ltv, payingUsers },
+      health: { revenueMonth: revMonth, revenuePrevMonth: revPrevMonth, momPct, active,
+        activePayers, churnedPayers, churnPct, arppu, ltv, payingUsers, payingUsersMonth },
       funnel: { entered: total, access: withDevice, paid: payingUsers },
       chart,
       recent: recent.map((p) => ({

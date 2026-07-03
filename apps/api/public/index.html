@@ -16,11 +16,18 @@
   textarea{min-height:80px;resize:vertical}
   .btn{background:var(--acc);border:0;color:#00131a;font-weight:700;padding:10px 14px;border-radius:11px}
   .btn.sec{background:#26324a} .btn.bad{background:var(--bad)} .btn.sm{padding:5px 9px;font-size:13px}
-  header{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--card);position:sticky;top:0;z-index:5}
-  header b{font-size:17px} nav{display:flex;gap:6px;flex-wrap:wrap}
-  nav button{background:transparent;border:1px solid var(--line);color:var(--mut);padding:7px 12px;border-radius:20px}
-  nav button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
-  main{max-width:960px;margin:0 auto;padding:18px}
+  #app{display:flex;min-height:100vh}
+  .side{width:230px;flex:0 0 230px;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;padding:16px 12px}
+  .side-top{display:flex;align-items:center;gap:10px;padding:4px 8px 16px}
+  .side-top .logo{font-size:22px;color:var(--acc)} .side-top b{font-size:16px}
+  .side nav{display:flex;flex-direction:column;gap:3px;overflow-y:auto;flex:1;scrollbar-width:none}
+  .side nav::-webkit-scrollbar{display:none}
+  .side nav button{display:flex;align-items:center;gap:11px;text-align:left;background:transparent;border:0;color:var(--mut);padding:10px 12px;border-radius:10px;font-size:14px;width:100%}
+  .side nav button:hover{background:#1a2233;color:var(--txt)}
+  .side nav button.on{background:rgba(34,211,238,.12);color:var(--acc);font-weight:600}
+  .side-foot{padding-top:12px;margin-top:8px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+  main{flex:1;max-width:1120px;margin:0 auto;padding:24px;min-width:0}
+  #burger{display:none}
   .card{background:linear-gradient(180deg,var(--cardhi),var(--card));border:1px solid var(--line);border-radius:16px;padding:16px;margin:0 0 14px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .grow{flex:1} .mut{color:var(--mut);font-size:13px} .pill{font-size:12px;padding:2px 8px;border-radius:20px;background:#26324a}
@@ -30,13 +37,13 @@
   code{background:#0c1119;padding:2px 6px;border-radius:6px;word-break:break-all}
   .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#0c1119;border:1px solid var(--line);padding:10px 16px;border-radius:10px}
   /* мобильный: меню — одна прокручиваемая лента, а не блок на весь экран */
-  @media (max-width: 720px){
-    header{flex-wrap:wrap;gap:8px;padding:10px 12px}
-    header b{font-size:16px}
-    nav{order:3;width:100%;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-    nav::-webkit-scrollbar{display:none}
-    nav button{flex:0 0 auto;white-space:nowrap;padding:6px 11px;font-size:13px}
-    main{padding:12px}
+  @media (max-width: 820px){
+    #app{display:block}
+    .side{position:fixed;left:-244px;top:0;z-index:20;transition:left .2s;box-shadow:0 0 40px rgba(0,0,0,.55)}
+    #app.nav-open .side{left:0}
+    #app.nav-open::after{content:'';position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:19}
+    #burger{display:inline-flex;align-items:center;position:fixed;top:10px;left:10px;z-index:22;background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:9px 13px;font-size:16px}
+    main{padding:56px 12px 12px}
     .card{padding:13px;border-radius:14px}
     table{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
     input,select,textarea{font-size:16px}
@@ -53,26 +60,29 @@
 </div>
 
 <div id="app" class="hidden">
-  <header>
-    <b>Kand</b><span id="ver" class="mut" style="font-size:11px"></span>
+  <button id="burger" onclick="document.getElementById('app').classList.toggle('nav-open')">☰</button>
+  <aside class="side">
+    <div class="side-top"><span class="logo">🛡</span><div><b>Kand</b> <span id="ver" class="mut" style="font-size:11px"></span><div class="mut" style="font-size:11px">Админ-панель</div></div></div>
     <nav>
-      <button data-tab="dashboard" class="on">Дашборд</button>
-      <button data-tab="nodes">Ноды</button>
-      <button data-tab="users">Клиенты</button>
-      <button data-tab="texts">Тексты и кнопки</button>
-      <button data-tab="plans">Тарифы</button>
-      <button data-tab="promo">Промокоды</button>
-      <button data-tab="payments">Платёжки</button>
-      <button data-tab="txns">Платежи</button>
-      <button data-tab="finance">Финансы</button>
-      <button data-tab="broadcast">Рассылка</button>
-      <button data-tab="tenants">Франшизы</button>
-      <button data-tab="brand">Бренд</button>
-      <button data-tab="audit">Аудит</button>
+      <button data-tab="dashboard" class="on">📊 Дашборд</button>
+      <button data-tab="users">👥 Клиенты</button>
+      <button data-tab="txns">💳 Платежи</button>
+      <button data-tab="finance">💰 Финансы</button>
+      <button data-tab="nodes">🖥 Серверы</button>
+      <button data-tab="promo">🎟 Промокоды</button>
+      <button data-tab="payments">💠 Платёжки</button>
+      <button data-tab="broadcast">📣 Рассылка</button>
+      <button data-tab="tenants">🏷 Франшизы</button>
+      <button data-tab="texts">✏️ Тексты и кнопки</button>
+      <button data-tab="plans">📦 Тарифы</button>
+      <button data-tab="brand">🎨 Бренд</button>
+      <button data-tab="audit">🧾 Аудит</button>
     </nav>
-    <span class="grow"></span>
-    <button class="btn sec sm" onclick="logout()">Выйти</button>
-  </header>
+    <div class="side-foot">
+      <div class="mut" style="font-size:12px">Вход как<br>admin</div>
+      <button class="btn sec sm" onclick="logout()">⎋ Выйти</button>
+    </div>
+  </aside>
   <main>
     <div id="tab-dashboard"></div>
     <div id="tab-nodes" class="hidden"></div>

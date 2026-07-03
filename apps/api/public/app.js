@@ -67,38 +67,44 @@ function switchTab(name) {
   document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
   document.querySelectorAll('main > div').forEach((d) => d.classList.add('hidden'));
   document.getElementById('tab-' + name).classList.remove('hidden');
+  document.getElementById('app').classList.remove('nav-open'); // закрыть меню на мобильном
   RENDER[name] && RENDER[name]();
 }
 document.querySelectorAll('nav button').forEach((b) => b.onclick = () => switchTab(b.dataset.tab));
 
 // ── ДАШБОРД ──────────────────────────────────────────────────────────────────
-function statCard(label, value, sub) {
-  return '<div class="card" style="flex:1;min-width:150px;margin:0">'
-    + `<div class="mut" style="font-size:11px;letter-spacing:.04em;text-transform:uppercase">${label}</div>`
+function statCard(label, value, sub, hint) {
+  return `<div class="card" style="flex:1;min-width:150px;margin:0"${hint ? ` title="${esc(hint)}"` : ''}>`
+    + `<div class="mut" style="font-size:11px;letter-spacing:.04em;text-transform:uppercase">${label}${hint ? ' <span style="cursor:help;opacity:.6">ⓘ</span>' : ''}</div>`
     + `<div style="font-size:26px;font-weight:800;margin:6px 0">${value}</div>`
     + (sub ? `<div class="mut" style="font-size:12px">${sub}</div>` : '') + '</div>';
 }
-// линия с заливкой (выручка)
-function lineChart(data, key, color) {
+// дата ДД.ММ + значение для подсказки графика
+function fmtDay(iso) { const p = String(iso).split('-'); return p.length === 3 ? p[2] + '.' + p[1] : iso; }
+function chartTip(d, key, unit) { const v = unit === 'money' ? Number(d[key]).toLocaleString('ru-RU') + '₽' : d[key] + ' рег.'; return `${fmtDay(d.date)}: ${v}`; }
+// линия с заливкой + точки + колонки-наведения (показывают дату/значение)
+function lineChart(data, key, color, unit) {
   const W = 680, H = 150, pad = 26, n = data.length; if (!n) return '';
   const max = Math.max(1, ...data.map((d) => d[key]));
   const xs = (i) => pad + i * (W - pad * 2) / (n - 1 || 1), ys = (v) => H - pad - (v / max) * (H - pad * 2);
   const pts = data.map((d, i) => `${xs(i).toFixed(0)},${ys(d[key]).toFixed(0)}`);
   const area = `M${pad},${H - pad} L` + pts.join(' L') + ` L${(W - pad).toFixed(0)},${H - pad} Z`;
-  const gid = 'g_' + key;
+  const colw = (W - pad * 2) / (n || 1), gid = 'g_' + key;
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">`
     + `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".35"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>`
     + `<path d="${area}" fill="url(#${gid})"/>`
     + `<polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="2"/>`
-    + data.map((d, i) => `<circle cx="${xs(i).toFixed(0)}" cy="${ys(d[key]).toFixed(0)}" r="6" fill="transparent"><title>${d.date}: ${d[key]}</title></circle>`).join('')
+    + data.map((d, i) => `<circle cx="${xs(i).toFixed(0)}" cy="${ys(d[key]).toFixed(0)}" r="2.5" fill="${color}"/>`).join('')
+    + data.map((d, i) => `<rect x="${(xs(i) - colw / 2).toFixed(0)}" y="0" width="${colw.toFixed(0)}" height="${H}" fill="transparent" style="cursor:pointer"><title>${esc(chartTip(d, key, unit))}</title></rect>`).join('')
     + '</svg>';
 }
-// столбики (регистрации)
-function barChart(data, key, color) {
+// столбики + колонки-наведения
+function barChart(data, key, color, unit) {
   const W = 680, H = 150, pad = 26, n = data.length; if (!n) return '';
   const max = Math.max(1, ...data.map((d) => d[key])), bw = (W - pad * 2) / n;
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">`
-    + data.map((d, i) => { const bh = (d[key] / max) * (H - pad * 2), x = pad + i * bw; return `<rect x="${(x + 2).toFixed(0)}" y="${(H - pad - bh).toFixed(0)}" width="${Math.max(1, bw - 4).toFixed(0)}" height="${bh.toFixed(0)}" rx="2" fill="${color}"><title>${d.date}: ${d[key]}</title></rect>`; }).join('')
+    + data.map((d, i) => { const bh = (d[key] / max) * (H - pad * 2), x = pad + i * bw; return `<rect x="${(x + 2).toFixed(0)}" y="${(H - pad - bh).toFixed(0)}" width="${Math.max(1, bw - 4).toFixed(0)}" height="${bh.toFixed(0)}" rx="2" fill="${color}"/>`; }).join('')
+    + data.map((d, i) => `<rect x="${(pad + i * bw).toFixed(0)}" y="0" width="${bw.toFixed(0)}" height="${H}" fill="transparent" style="cursor:pointer"><title>${esc(chartTip(d, key, unit))}</title></rect>`).join('')
     + '</svg>';
 }
 function funnelRow(label, value, pct, color) {
@@ -119,11 +125,11 @@ RENDER.dashboard = async function () {
     el.innerHTML =
       `<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><b style="font-size:17px">Здоровье бизнеса</b>${mom}</div>`
       + '<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:14px">'
-      + statCard('Выручка / мес', money(h.revenueMonth), 'живые деньги за 30 дн.')
-      + statCard('Активных', h.active, 'действующих подписок')
-      + statCard('Отток / мес', (h.churnPct || 0) + '%', 'подписок закончилось')
-      + statCard('ARPU', money(h.arpu), 'в среднем с 1 клиента/мес')
-      + statCard('LTV', money(h.ltv), 'принёс 1 клиент всего')
+      + statCard('Выручка / 30 дн', money(h.revenueMonth), 'полученные оплаты', 'Реально полученные оплаты за последние 30 дней (оплата с баланса не считается повторно).')
+      + statCard('Активных', h.active, 'действующих подписок', 'Клиенты с действующей подпиской прямо сейчас (не заблокированные, срок в будущем).')
+      + statCard('Отток / 30 дн', (h.churnPct || 0) + '%', `${h.churnedPayers || 0} платящих ушло`, 'Только среди ПЛАТЯЩИХ: у кого подписка кончилась за 30 дн и не продлена. % = ушедшие ÷ (активные платящие + ушедшие). Триал/бесплатные не учитываются.')
+      + statCard('ARPPU / 30 дн', money(h.arppu), `с 1 платящего · ${h.payingUsersMonth || 0} чел.`, 'Средняя выручка с одного ПЛАТЯЩЕГО клиента за 30 дней = выручка за 30 дн ÷ число платящих за 30 дн.')
+      + statCard('LTV', money(h.ltv), `с 1 платящего всего · ${h.payingUsers || 0} чел.`, 'Средний доход с одного платящего за всё время = вся полученная выручка ÷ всех, кто хоть раз платил.')
       + '</div>'
       + '<div class="card"><b>Воронка (главный бот)</b>'
       + funnelRow('Зашли', f.entered, 100, 'var(--acc)')
@@ -131,8 +137,8 @@ RENDER.dashboard = async function () {
       + funnelRow('Оплатили', f.paid, pct(f.paid, f.entered), 'var(--ok)')
       + '</div>'
       + '<div class="row" style="gap:12px;flex-wrap:wrap">'
-      + `<div class="card" style="flex:1;min-width:280px"><div class="row" style="justify-content:space-between"><b>Выручка по дням</b><span class="pill ok">${money(h.revenueMonth)}</span></div><div class="mut" style="font-size:12px;margin:2px 0 6px">30 дней</div>${lineChart(s.chart, 'revenue', '#22D3EE')}</div>`
-      + `<div class="card" style="flex:1;min-width:280px"><div class="row" style="justify-content:space-between"><b>Регистрации</b><span class="pill">${s.chart.reduce((a, c) => a + c.signups, 0)}</span></div><div class="mut" style="font-size:12px;margin:2px 0 6px">по дням</div>${barChart(s.chart, 'signups', '#34D399')}</div>`
+      + `<div class="card" style="flex:1;min-width:280px"><div class="row" style="justify-content:space-between"><b>Выручка по дням</b><span class="pill ok">${money(h.revenueMonth)}</span></div><div class="mut" style="font-size:12px;margin:2px 0 6px">30 дней · наведи на график</div>${lineChart(s.chart, 'revenue', '#22D3EE', 'money')}</div>`
+      + `<div class="card" style="flex:1;min-width:280px"><div class="row" style="justify-content:space-between"><b>Регистрации</b><span class="pill">${s.chart.reduce((a, c) => a + c.signups, 0)}</span></div><div class="mut" style="font-size:12px;margin:2px 0 6px">по дням · наведи на график</div>${barChart(s.chart, 'signups', '#34D399', 'count')}</div>`
       + '</div>'
       + '<div class="card"><b>Последние платежи</b>'
       + (s.recent.length ? '<table><tr><th>Клиент</th><th>Сумма</th><th>Способ</th><th>Когда</th></tr>'

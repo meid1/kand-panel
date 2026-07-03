@@ -271,8 +271,10 @@ RENDER.nodes = async function () {
     + '<div id="n_install"></div></div><div class="card"><b>Ноды</b><div id="n_list" class="mut">загрузка…</div></div>';
   try {
     const nodes = await api('/nodes');
-    document.getElementById('n_list').innerHTML = nodes.length ? '<table><tr><th>Нода</th><th>Хост</th><th>Протоколы</th><th></th></tr>'
-      + nodes.map((n) => `<tr><td>${esc(n.label)} ${n.isActive ? '<span class="pill ok">вкл</span>' : '<span class="pill bad">выкл</span>'} ${n.online ? '<span class="pill ok">online</span>' : '<span class="pill bad">offline</span>'}`
+    window._nodes = nodes;
+    document.getElementById('n_list').innerHTML = nodes.length ? '<div class="mut" style="font-size:12px;margin-bottom:6px">Порядок ↑↓ = очередь в подписке у клиента. Название в подписке = имя ноды.</div><table><tr><th>#</th><th>Нода</th><th>Хост</th><th>Протоколы</th><th></th></tr>'
+      + nodes.map((n, i) => `<tr><td style="white-space:nowrap"><button class="btn sec sm" ${i === 0 ? 'disabled' : ''} onclick="moveNode(${i},-1)">↑</button> <button class="btn sec sm" ${i === nodes.length - 1 ? 'disabled' : ''} onclick="moveNode(${i},1)">↓</button></td>`
+        + `<td>${esc(n.label)} ${n.isActive ? '<span class="pill ok">вкл</span>' : '<span class="pill bad">выкл</span>'} ${n.online ? '<span class="pill ok">online</span>' : '<span class="pill bad">offline</span>'}`
         + `<div class="mut" style="font-size:11px">${n.lastCheck ? 'проверка: ' + new Date(n.lastCheck).toLocaleString() : 'ещё не проверялась'} <span id="hc_${n.id}"></span></div></td>`
         + `<td class="mut">${esc(n.address)}<br>${esc(n.ip)}</td><td class="mut">${(n.protocols || []).join(', ')}</td>`
         + `<td class="row"><button class="btn sec sm" onclick="checkNode('${n.id}')">🔄 проверить</button>`
@@ -369,6 +371,13 @@ async function addNode() {
 async function toggleNode(id, active) { try { await api('/nodes/' + id, { method: 'PATCH', body: JSON.stringify({ isActive: active }) }); RENDER.nodes(); } catch (e) { toast(e.message); } }
 async function setWarp(id, enable) { toast(enable ? 'включаю WARP…' : 'выключаю WARP…'); try { const r = await api('/nodes/' + id + '/warp', { method: 'POST', body: JSON.stringify({ enable }) }); toast(r.pushed ? 'WARP применён на сервере' : 'сохранено (сервер офлайн — применится позже)'); RENDER.nodes(); } catch (e) { toast(e.message); } }
 async function delNode(id) { if (!confirm('Удалить ноду?')) return; try { await api('/nodes/' + id, { method: 'DELETE' }); RENDER.nodes(); } catch (e) { toast(e.message); } }
+// порядок нод в подписке: меняем местами соседей и сохраняем через /nodes/reorder
+async function moveNode(i, dir) {
+  const arr = (window._nodes || []).map((n) => n.id);
+  const j = i + dir; if (j < 0 || j >= arr.length) return;
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  try { await api('/nodes/reorder', { method: 'PUT', body: JSON.stringify({ ids: arr }) }); RENDER.nodes(); } catch (e) { toast(e.message); }
+}
 
 // ── КЛИЕНТЫ ──────────────────────────────────────────────────────────────────
 let U_SEARCH = '', U_OFFSET = 0, _uSearchT = null;

@@ -73,12 +73,34 @@ export class UsersService {
     return new Date(r[0].now).getTime();
   }
 
-  async findAll(tenantId?: string) {
-    return this.prisma.user.findMany({
-      where: tenantId ? { tenantId } : undefined,
-      orderBy: { createdAt: 'desc' },
-      include: { tenant: { select: { brand: true, kind: true } }, devices: true },
-    });
+  /**
+   * Список клиентов с поиском и пагинацией (для админки с тысячами юзеров).
+   * search — по имени/username/tgId/externalId. Возвращает {rows, total}.
+   */
+  async findAll(opts: { tenantId?: string; search?: string; limit?: number; offset?: number } = {}) {
+    const where: any = {};
+    if (opts.tenantId) where.tenantId = opts.tenantId;
+    const s = (opts.search || '').trim();
+    if (s) {
+      const or: any[] = [
+        { tgName: { contains: s, mode: 'insensitive' } },
+        { tgUsername: { contains: s, mode: 'insensitive' } },
+        { externalId: { contains: s, mode: 'insensitive' } },
+      ];
+      const digits = s.replace(/\D/g, '');
+      if (digits) { try { or.push({ tgId: BigInt(digits) }); } catch { /* too big */ } }
+      where.OR = or;
+    }
+    const take = Math.min(Math.max(Number(opts.limit) || 50, 1), 200);
+    const skip = Math.max(Number(opts.offset) || 0, 0);
+    const [rows, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where, orderBy: { createdAt: 'desc' }, take, skip,
+        include: { tenant: { select: { brand: true, kind: true } }, devices: true },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    return { rows, total, limit: take, offset: skip };
   }
 
   async findOne(id: string) {

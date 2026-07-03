@@ -36,8 +36,13 @@ export class UsersController {
   }
 
   @Get()
-  list(@Query('tenantId') tenantId?: string) {
-    return this.users.findAll(tenantId);
+  list(
+    @Query('tenantId') tenantId?: string,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.users.findAll({ tenantId, search, limit: Number(limit), offset: Number(offset) });
   }
 
   @Get(':id')

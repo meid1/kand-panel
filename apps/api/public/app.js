@@ -195,20 +195,39 @@ async function setWarp(id, enable) { toast(enable ? 'включаю WARP…' : '
 async function delNode(id) { if (!confirm('Удалить ноду?')) return; try { await api('/nodes/' + id, { method: 'DELETE' }); RENDER.nodes(); } catch (e) { toast(e.message); } }
 
 // ── КЛИЕНТЫ ──────────────────────────────────────────────────────────────────
+let U_SEARCH = '', U_OFFSET = 0, _uSearchT = null;
+const U_PAGE = 50;
 RENDER.users = async function () {
   const el = document.getElementById('tab-users');
-  el.innerHTML = '<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><b>Клиенты</b>'
+  el.innerHTML = '<div class="card"><div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b>Клиенты</b>'
+    + '<input id="u_search" placeholder="🔍 Поиск: имя / @username / ID" style="flex:1;min-width:200px;max-width:360px" oninput="onUserSearch(this.value)">'
     + '<button class="btn sm" onclick="createManualKey()">🔑 Создать ключ</button></div>'
-    + '<div id="u_list" class="mut">загрузка…</div></div><div id="u_card"></div>';
+    + '<div id="u_list" class="mut">загрузка…</div><div id="u_pager" class="row" style="margin-top:8px;gap:10px;align-items:center"></div></div><div id="u_card"></div>';
+  U_OFFSET = 0; U_SEARCH = ''; loadUsers();
+};
+function onUserSearch(v) { U_SEARCH = v.trim(); U_OFFSET = 0; clearTimeout(_uSearchT); _uSearchT = setTimeout(loadUsers, 300); }
+function pageUsers(d) { U_OFFSET = Math.max(0, U_OFFSET + d * U_PAGE); loadUsers(); }
+async function loadUsers() {
+  const list = document.getElementById('u_list'); if (!list) return;
   try {
-    const users = await api('/users');
-    document.getElementById('u_list').innerHTML = users.length ? '<table><tr><th>Клиент</th><th>Тариф до</th><th>Устройств</th><th></th></tr>'
-      + users.map((u) => `<tr><td>${esc(u.tgName || u.tgUsername || u.tgId)} ${u.tenant && u.tenant.kind === 'franchise' ? '<span class="pill">' + esc(u.tenant.brand) + '</span>' : ''}</td>`
+    const q = new URLSearchParams({ limit: U_PAGE, offset: U_OFFSET });
+    if (U_SEARCH) q.set('search', U_SEARCH);
+    const r = await api('/users?' + q.toString());
+    const rows = r.rows || r; const total = r.total != null ? r.total : rows.length;
+    list.innerHTML = rows.length ? '<table><tr><th>Клиент</th><th>Тариф до</th><th>Устройств</th><th></th></tr>'
+      + rows.map((u) => `<tr><td>${esc(u.tgName || u.tgUsername || u.tgId)} ${u.tenant && u.tenant.kind === 'franchise' ? '<span class="pill">' + esc(u.tenant.brand) + '</span>' : ''}</td>`
         + `<td class="mut">${u.expireAt ? new Date(u.expireAt).toLocaleDateString() : '—'}</td><td class="mut">${(u.devices || []).length}</td>`
         + `<td><button class="btn sec sm" onclick="openUser('${u.id}')">открыть</button></td></tr>`).join('') + '</table>'
-      : '<span class="mut">нет клиентов</span>';
-  } catch (e) { document.getElementById('u_list').textContent = e.message; }
-};
+      : '<span class="mut">ничего не найдено</span>';
+    const pg = document.getElementById('u_pager');
+    if (pg) {
+      const from = total ? U_OFFSET + 1 : 0, to = Math.min(U_OFFSET + U_PAGE, total);
+      pg.innerHTML = `<span class="mut">${from}–${to} из ${total}</span>`
+        + (U_OFFSET > 0 ? '<button class="btn sec sm" onclick="pageUsers(-1)">← назад</button>' : '')
+        + (to < total ? '<button class="btn sec sm" onclick="pageUsers(1)">вперёд →</button>' : '');
+    }
+  } catch (e) { list.textContent = e.message; }
+}
 // Ручное создание ключа (выдать кому-то без Telegram). Показываем готовые ссылки.
 async function createManualKey() {
   const name = prompt('Название ключа (кому выдаём):', 'Ручной ключ');

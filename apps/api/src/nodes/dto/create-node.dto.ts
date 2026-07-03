@@ -9,8 +9,8 @@ export type Protocol = (typeof PROTOCOLS)[number];
 export class CreateNodeDto {
   @IsString() label!: string;
 
-  // хост/IP для клиентских ссылок (может быть домен)
-  @IsString() address!: string;
+  // хост/IP для клиентских ссылок (может быть домен). Необязательно: пусто = как IP.
+  @IsOptional() @IsString() address?: string;
 
   // публичный IP (для SAN сертификата и mTLS)
   @Matches(/^\d{1,3}(\.\d{1,3}){3}$/, { message: 'ip должен быть IPv4' })

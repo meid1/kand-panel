@@ -45,6 +45,18 @@ export class BridgeService {
     try { const r = await this.call('GET', '/v1/nodes'); return r?.data || null; }
     catch { return null; }
   }
+  /** Топ клиентов по трафику (up+down) из внешнего бэкенда. */
+  async trafficTop(limit = 50): Promise<any[]> {
+    if (!this.enabled) return [];
+    try {
+      const r = await this.call('GET', '/v1/clients');
+      const list: any[] = r?.data || [];
+      return list
+        .map((c) => ({ email: c.email, up: Number(c.up || 0), down: Number(c.down || 0), total: Number(c.up || 0) + Number(c.down || 0), online: c.online }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, limit);
+    } catch { return []; }
+  }
 
   async setEnabled(email: string, on: boolean) {
     return this.safe(() => this.call('POST', `/v1/clients/${on ? 'on' : 'off'}-by-email/${encodeURIComponent(email)}`), `${on ? 'on' : 'off'} ${email}`);

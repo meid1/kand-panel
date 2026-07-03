@@ -60,6 +60,7 @@ export class NodesService {
 
   async create(dto: CreateNodeDto) {
     if (!dto.protocols?.length) throw new BadRequestException('нужен хотя бы один протокол');
+    dto.address = (dto.address || '').trim() || dto.ip; // пусто → адрес = IP
 
     const port = dto.port ?? 443;
     const reality = this.realityKeypair();
@@ -117,6 +118,39 @@ export class NodesService {
 
     const install = this.installCommand(node.id, bundle);
     return { node: this.strip(node), install };
+  }
+
+  /**
+   * Ручное добавление УЖЕ настроенного сервера (не управляется агентом Kand):
+   * оператор вводит свои reality-параметры (pbk/sid/sni/порты). Kand только отдаёт
+   * такие ссылки в подписке. Установка/агент не нужны — сервер уже поднят.
+   */
+  async addExisting(b: any) {
+    const protocols: string[] = Array.isArray(b.protocols) && b.protocols.length ? b.protocols : ['reality-tcp'];
+    if (!b.ip) throw new BadRequestException('нужен IP');
+    const address = (b.address || '').trim() || b.ip;
+    const port = Number(b.port) || 443;
+    const grpcPort = Number(b.grpcPort) || port;
+    const ibs = protocols.map((p) => {
+      const net = p === 'reality-grpc' ? 'grpc' : p === 'xhttp' ? 'xhttp' : p === 'hysteria2' ? 'hysteria2' : 'tcp';
+      return {
+        protocol: p === 'hysteria2' ? 'hysteria2' : 'vless',
+        network: net,
+        tag: net === 'grpc' ? (b.grpcServiceName || 'grpc') : net,
+        port: net === 'grpc' ? grpcPort : port,
+      };
+    });
+    const node = await this.prisma.node.create({
+      data: {
+        tenantId: b.tenantId ?? null,
+        label: b.label || address, address, ip: String(b.ip), port,
+        protocols, sni: b.sni || 'www.google.com',
+        realityPbk: b.realityPbk || '', realitySid: b.realitySid || '',
+        secretKey: 'manual', role: b.role || 'exit', showInSub: true,
+        inbounds: { create: ibs.map((i) => ({ tag: i.tag, protocol: i.protocol, network: i.network, port: i.port })) } as any,
+      },
+    });
+    return { node: this.strip(node) };
   }
 
   /** Базовый xray-конфиг: reality/xhttp-инбаунды + api + routing (+ WARP если задан). */

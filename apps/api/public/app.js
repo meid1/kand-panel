@@ -256,19 +256,36 @@ async function delLedger(id) {
 const PROTOS = ['reality-tcp', 'reality-grpc', 'hysteria2', 'xhttp'];
 RENDER.nodes = async function () {
   const el = document.getElementById('tab-nodes');
-  el.innerHTML = '<div class="card"><b>Добавить ноду</b>'
-    + '<label class="fld">Название</label><input id="n_label" placeholder="🇳🇱 Нидерланды-1">'
-    + '<div class="row"><div class="grow"><label class="fld">Хост/домен (для клиентов)</label><input id="n_addr" placeholder="nl1.example.com"></div>'
-    + '<div class="grow"><label class="fld">IP сервера</label><input id="n_ip" placeholder="1.2.3.4"></div></div>'
-    + '<label class="fld">Протоколы</label><div class="row" id="n_protos">'
-    + PROTOS.map((p) => `<label class="pill"><input type="checkbox" value="${p}" ${p.startsWith('reality') ? 'checked' : ''} style="width:auto;margin:0 6px 0 0"> ${p}</label>`).join('')
-    + '</div><label class="fld">Роль ноды</label><select id="n_role">'
+  const protoBoxes = (pre) => PROTOS.map((p) => `<label class="pill"><input type="checkbox" id="${pre}${p}" value="${p}" ${p.startsWith('reality') ? 'checked' : ''} style="width:auto;margin:0 6px 0 0"> ${p}</label>`).join('');
+  el.innerHTML = '<div class="card"><b>Добавить сервер</b>'
+    + '<div class="mut" style="font-size:12px;margin:4px 0 10px">Два способа: <b>автонастройка</b> (введи IP → получи команду, сервер настроится сам) или <b>вручную</b> (уже готовый сервер — введи его параметры).</div>'
+    + '<label class="fld">Название <span class="mut">(показывается в подписке у клиента)</span></label><input id="n_label" placeholder="🇳🇱 Нидерланды-1">'
+    + '<div class="row"><div class="grow"><label class="fld">IP сервера</label><input id="n_ip" placeholder="1.2.3.4"></div>'
+    + '<div class="grow"><label class="fld">Хост/домен для клиентов <span class="mut">(необязательно)</span></label><input id="n_addr" placeholder="пусто = как IP"></div></div>'
+    + '<div class="mut" style="font-size:11px;margin:-2px 0 8px">Хост/домен — адрес в клиентской ссылке. Обычно оставь пустым (будет = IP). Домен нужен, только если сервер стоит за CDN/прокси.</div>'
+    + '<label class="fld">Протоколы</label><div class="row">' + protoBoxes('n_')
+    + '</div><label class="fld">Роль сервера</label><select id="n_role">'
     + '<option value="exit">Обычный выход (VPN)</option>'
     + '<option value="yt-ru">YouTube-РФ (без рекламы)</option>'
     + '<option value="bypass-origin">Origin для обхода</option></select>'
     + '<div class="row" style="margin-top:8px"><label class="pill"><input type="checkbox" id="n_warp" style="width:auto;margin:0 6px 0 0">🤖 WARP — чистый IP для нейросетей (ChatGPT/Claude/Gemini)</label></div>'
-    + '<div style="margin-top:10px"><button class="btn" onclick="addNode()">Создать и получить команду</button></div>'
-    + '<div id="n_install"></div></div><div class="card"><b>Ноды</b><div id="n_list" class="mut">загрузка…</div></div>';
+    + '<div class="row" style="margin-top:10px"><button class="btn" onclick="addNode()">⚙️ Автонастройка — создать и получить команду</button>'
+    + '<button class="btn sec" onclick="toggleManual()">✍️ Добавить готовый сервер вручную</button></div>'
+    + '<div id="n_install"></div>'
+    // ── ручное добавление готового сервера ──
+    + '<div id="n_manual" style="display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:12px">'
+    + '<b>Ручное добавление готового сервера</b>'
+    + '<div class="mut" style="font-size:12px;margin:4px 0 8px">Сервер уже настроен (xray + reality). Введи его параметры — Kand просто отдаст такие ссылки в подписке, ничего не устанавливая. Проще всего взять из рабочей vless-ссылки этого сервера: <code>pbk</code>, <code>sid</code>, <code>sni</code>, порт.</div>'
+    + '<label class="fld">Название</label><input id="m_label" placeholder="🇩🇪 Мой сервер">'
+    + '<div class="row"><div class="grow"><label class="fld">IP</label><input id="m_ip" placeholder="1.2.3.4"></div><div class="grow"><label class="fld">Хост/домен (необяз.)</label><input id="m_addr" placeholder="пусто = как IP"></div></div>'
+    + '<div class="row"><div class="grow"><label class="fld">Порт (reality/tcp)</label><input id="m_port" value="443"></div><div class="grow"><label class="fld">SNI (serverName)</label><input id="m_sni" placeholder="www.google.com"></div></div>'
+    + '<div class="row"><div class="grow"><label class="fld">Reality pbk (publicKey)</label><input id="m_pbk"></div><div class="grow"><label class="fld">Reality sid (shortId)</label><input id="m_sid"></div></div>'
+    + '<div class="row"><div class="grow"><label class="fld">gRPC порт (если reality-grpc)</label><input id="m_gport" placeholder="2053"></div><div class="grow"><label class="fld">gRPC serviceName</label><input id="m_gsvc" placeholder="grpc"></div></div>'
+    + '<label class="fld">Протоколы</label><div class="row">' + protoBoxes('m_') + '</div>'
+    + '<div style="margin-top:10px"><button class="btn" onclick="addExistingNode()">Добавить готовый сервер</button></div>'
+    + '</div>'
+    + '</div><div class="card"><b>Серверы</b><div id="cdn_nodes"></div><div id="n_list" class="mut">загрузка…</div></div>';
+  loadCdnNodes();
   try {
     const nodes = await api('/nodes');
     window._nodes = nodes;
@@ -350,23 +367,53 @@ async function manualNode(id) {
     box.scrollIntoView({ behavior: 'smooth' });
   } catch (e) { toast(e.message); }
 }
+function checkedProtos(pre) { return PROTOS.filter((p) => { const el = document.getElementById(pre + p); return el && el.checked; }); }
+function toggleManual() { const m = document.getElementById('n_manual'); m.style.display = m.style.display === 'none' ? 'block' : 'none'; if (m.style.display === 'block') m.scrollIntoView({ behavior: 'smooth' }); }
 async function addNode() {
-  const protocols = [...document.querySelectorAll('#n_protos input:checked')].map((i) => i.value);
+  const protocols = checkedProtos('n_');
   const body = {
     label: document.getElementById('n_label').value.trim(),
-    address: document.getElementById('n_addr').value.trim(),
+    address: document.getElementById('n_addr').value.trim() || undefined,
     ip: document.getElementById('n_ip').value.trim(),
     protocols,
     role: document.getElementById('n_role').value,
     warp: document.getElementById('n_warp').checked,
   };
-  if (!body.label || !body.address || !body.ip || !protocols.length) return toast('заполни все поля и протоколы');
+  if (!body.label || !body.ip || !protocols.length) return toast('нужны название, IP и хотя бы один протокол');
   try {
     const r = await api('/nodes', { method: 'POST', body: JSON.stringify(body) });
     document.getElementById('n_install').innerHTML =
-      '<label class="fld">Команда установки (выполни на сервере ноды):</label><code>' + esc(r.install) + '</code>';
-    toast('нода создана'); RENDER.nodes();
+      '<label class="fld">Команда установки (выполни на сервере):</label><code>' + esc(r.install) + '</code>';
+    toast('сервер создан'); RENDER.nodes();
   } catch (e) { toast(e.message); }
+}
+async function addExistingNode() {
+  const body = {
+    label: document.getElementById('m_label').value.trim(),
+    ip: document.getElementById('m_ip').value.trim(),
+    address: document.getElementById('m_addr').value.trim() || undefined,
+    port: Number(document.getElementById('m_port').value) || 443,
+    sni: document.getElementById('m_sni').value.trim() || undefined,
+    realityPbk: document.getElementById('m_pbk').value.trim(),
+    realitySid: document.getElementById('m_sid').value.trim(),
+    grpcPort: Number(document.getElementById('m_gport').value) || undefined,
+    grpcServiceName: document.getElementById('m_gsvc').value.trim() || undefined,
+    protocols: checkedProtos('m_'),
+  };
+  if (!body.ip || !body.protocols.length) return toast('нужны IP и хотя бы один протокол');
+  try { await api('/nodes/existing', { method: 'POST', body: JSON.stringify(body) }); toast('сервер добавлен'); RENDER.nodes(); } catch (e) { toast(e.message); }
+}
+// живые серверы внешнего бэкенда (cdn_api) — только показать
+async function loadCdnNodes() {
+  const box = document.getElementById('cdn_nodes'); if (!box) return;
+  try {
+    const r = await api('/bridge/nodes');
+    if (!r.enabled || !r.nodes || !r.nodes.length) { box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="mut" style="font-size:12px;margin-bottom:6px">🟢 Живые серверы (внешний бэкенд, только просмотр):</div>'
+      + '<table><tr><th>Сервер</th><th>Хост</th><th>Протоколы</th></tr>'
+      + r.nodes.map((n) => `<tr><td>${esc(n.remark || n.host || '—')}</td><td class="mut">${esc(n.host || '')}${n.port ? ':' + n.port : ''}</td><td class="mut">${esc((n.protos || []).join(', '))}</td></tr>`).join('')
+      + '</table><div style="height:14px"></div>';
+  } catch (e) { box.innerHTML = ''; }
 }
 async function toggleNode(id, active) { try { await api('/nodes/' + id, { method: 'PATCH', body: JSON.stringify({ isActive: active }) }); RENDER.nodes(); } catch (e) { toast(e.message); } }
 async function setWarp(id, enable) { toast(enable ? 'включаю WARP…' : 'выключаю WARP…'); try { const r = await api('/nodes/' + id + '/warp', { method: 'POST', body: JSON.stringify({ enable }) }); toast(r.pushed ? 'WARP применён на сервере' : 'сохранено (сервер офлайн — применится позже)'); RENDER.nodes(); } catch (e) { toast(e.message); } }

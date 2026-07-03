@@ -33,6 +33,12 @@ export class NodesController {
     return this.nodes.checkHealth(id);
   }
 
+  // ручное добавление уже настроенного сервера (свои reality-параметры)
+  @Post('existing')
+  addExisting(@Body() body: any) {
+    return this.nodes.addExisting(body);
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateNodeDto) {
     return this.nodes.update(id, dto);

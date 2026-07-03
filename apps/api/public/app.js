@@ -1,5 +1,5 @@
 // Kand admin — vanilla JS, без сборки. Работает на статике, ходит в /api с JWT.
-const APP_VERSION = 'v0.16.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
+const APP_VERSION = 'v0.17.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
 const API = '/api';
 let TOKEN = localStorage.getItem('vp_token') || '';
 // показать версию (шапка + вход)
@@ -225,7 +225,8 @@ let P_SEARCH = '', P_STATUS = '', P_OFFSET = 0, _pT = null;
 const P_PAGE = 50;
 RENDER.txns = async function () {
   const el = document.getElementById('tab-txns');
-  el.innerHTML = '<div class="card"><div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><b>Платежи</b>'
+  el.innerHTML = '<div class="phead" style="margin-bottom:12px"><h2>Платежи</h2><div class="sub">все транзакции: поиск, фильтр по статусу, ручная смена статуса</div></div>'
+    + '<div class="card"><div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><b>Платежи</b>'
     + '<input id="p_search" placeholder="🔍 клиент / способ / invoice" style="flex:1;min-width:180px;max-width:320px" oninput="onPaySearch(this.value)">'
     + '<select id="p_status" onchange="onPayStatus(this.value)"><option value="">все статусы</option><option value="paid">оплачен</option><option value="pending">ожидает</option><option value="failed">неудача</option><option value="refunded">возврат</option><option value="granted">выдан(не доход)</option></select></div>'
     + '<div id="p_list" class="mut">загрузка…</div><div id="p_pager" class="row" style="margin-top:8px;gap:10px;align-items:center"></div></div>';
@@ -324,7 +325,8 @@ RENDER.traffic = async function () {
     const r = await api('/bridge/traffic-top');
     if (!r.enabled) { el.innerHTML = '<div class="card"><b>Трафик</b><div class="mut" style="margin-top:6px">Данные о трафике приходят из внешнего бэкенда (мост не подключён). Для нод Kand трафик считается модулем статистики.</div></div>'; return; }
     const top = r.top || [];
-    el.innerHTML = '<div class="card"><b>Топ по трафику</b><div class="mut" style="font-size:12px;margin:4px 0 8px">50 клиентов с наибольшим трафиком (из живого бэкенда)</div>'
+    el.innerHTML = '<div class="phead" style="margin-bottom:12px"><h2>Трафик</h2><div class="sub">топ клиентов по объёму (из живого бэкенда)</div></div>'
+      + '<div class="card"><b>Топ по трафику</b><div class="mut" style="font-size:12px;margin:4px 0 8px">50 клиентов с наибольшим трафиком (из живого бэкенда)</div>'
       + (top.length ? '<table><tr><th>#</th><th>Клиент</th><th>Всего</th><th>↑</th><th>↓</th></tr>'
         + top.map((c, i) => `<tr><td class="mut">${i + 1}</td><td>${esc(c.email)} ${c.online ? '<span class="pill ok">online</span>' : ''}</td><td><b>${gb(c.total)}</b></td><td class="mut">${gb(c.up)}</td><td class="mut">${gb(c.down)}</td></tr>`).join('') + '</table>'
         : '<div class="mut">нет данных</div>') + '</div>';
@@ -335,7 +337,8 @@ RENDER.hwid = async function () {
   const el = document.getElementById('tab-hwid'); el.innerHTML = '<div class="mut">загрузка…</div>';
   try {
     const rows = await api('/users/hwid-top');
-    el.innerHTML = '<div class="card"><b>HWID — подозрительные</b><div class="mut" style="font-size:12px;margin:4px 0 8px">Клиенты с наибольшим числом устройств (возможный шеринг). Считается по подпискам, которые отдаёт Kand (заголовок x-hwid от приложений).</div>'
+    el.innerHTML = '<div class="phead" style="margin-bottom:12px"><h2>HWID</h2><div class="sub">клиенты с максимумом устройств — возможный шеринг</div></div>'
+      + '<div class="card"><b>HWID — подозрительные</b><div class="mut" style="font-size:12px;margin:4px 0 8px">Клиенты с наибольшим числом устройств (возможный шеринг). Считается по подпискам, которые отдаёт Kand (заголовок x-hwid от приложений).</div>'
       + (rows.length ? '<table><tr><th>Клиент</th><th>Устройств</th><th></th></tr>'
         + rows.map((u) => `<tr><td>${esc(u.tgName || u.tgUsername || u.tgId)} ${u.isBlocked ? '<span class="pill bad">заблок</span>' : ''}</td><td><span class="pill">${u.hwidCount} HWID</span></td><td><button class="btn bad sm" onclick="toggleBlock('${u.id}',true)">🚫 Бан</button> <button class="btn sec sm" onclick="openUser('${u.id}')">открыть</button></td></tr>`).join('') + '</table>'
         : '<div class="mut">подозрительных нет (или подписки идут через внешний бэкенд — тогда HWID считает он)</div>') + '</div>';

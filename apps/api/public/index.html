@@ -43,7 +43,8 @@
   <header>
     <b>Kand</b>
     <nav>
-      <button data-tab="nodes" class="on">Ноды</button>
+      <button data-tab="dashboard" class="on">Дашборд</button>
+      <button data-tab="nodes">Ноды</button>
       <button data-tab="users">Клиенты</button>
       <button data-tab="texts">Тексты и кнопки</button>
       <button data-tab="plans">Тарифы</button>
@@ -58,7 +59,8 @@
     <button class="btn sec sm" onclick="logout()">Выйти</button>
   </header>
   <main>
-    <div id="tab-nodes"></div>
+    <div id="tab-dashboard"></div>
+    <div id="tab-nodes" class="hidden"></div>
     <div id="tab-users" class="hidden"></div>
     <div id="tab-texts" class="hidden"></div>
     <div id="tab-plans" class="hidden"></div>

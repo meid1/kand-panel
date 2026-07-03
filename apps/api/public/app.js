@@ -45,7 +45,7 @@ function logout() {
 function showApp() {
   document.getElementById('login').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
-  switchTab('nodes');
+  switchTab('dashboard');
 }
 
 // ── tabs ─────────────────────────────────────────────────────────────────────
@@ -57,6 +57,62 @@ function switchTab(name) {
   RENDER[name] && RENDER[name]();
 }
 document.querySelectorAll('nav button').forEach((b) => b.onclick = () => switchTab(b.dataset.tab));
+
+// ── ДАШБОРД ──────────────────────────────────────────────────────────────────
+function statCard(label, value, sub) {
+  return '<div class="card" style="flex:1;min-width:150px;margin:0">'
+    + `<div class="mut" style="font-size:13px">${label}</div>`
+    + `<div style="font-size:26px;font-weight:700;margin:4px 0">${value}</div>`
+    + (sub ? `<div class="mut" style="font-size:12px">${sub}</div>` : '') + '</div>';
+}
+// простой SVG-график: две метрики (доход столбиками, регистрации линией)
+function miniChart(chart) {
+  const W = 640, H = 140, pad = 24;
+  const n = chart.length; if (!n) return '';
+  const maxR = Math.max(1, ...chart.map((c) => c.revenue));
+  const maxS = Math.max(1, ...chart.map((c) => c.signups));
+  const bw = (W - pad * 2) / n;
+  let bars = '', pts = [];
+  chart.forEach((c, i) => {
+    const x = pad + i * bw;
+    const bh = (c.revenue / maxR) * (H - pad * 2);
+    bars += `<rect x="${x + 3}" y="${H - pad - bh}" width="${bw - 6}" height="${bh}" rx="3" fill="var(--acc)" opacity="0.85"><title>${c.date}: ${c.revenue}₽, ${c.signups} рег.</title></rect>`;
+    const sy = H - pad - (c.signups / maxS) * (H - pad * 2);
+    pts.push(`${(x + bw / 2).toFixed(0)},${sy.toFixed(0)}`);
+  });
+  const line = `<polyline points="${pts.join(' ')}" fill="none" stroke="#ffb020" stroke-width="2"/>`;
+  const dots = pts.map((p) => `<circle cx="${p.split(',')[0]}" cy="${p.split(',')[1]}" r="2.5" fill="#ffb020"/>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">${bars}${line}${dots}</svg>`;
+}
+RENDER.dashboard = async function () {
+  const el = document.getElementById('tab-dashboard');
+  el.innerHTML = '<div class="mut">загрузка…</div>';
+  try {
+    const s = await api('/dashboard/summary');
+    const money = (v) => Number(v).toLocaleString('ru-RU') + '₽';
+    el.innerHTML =
+      '<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:12px">'
+      + statCard('Клиентов активно', s.users.active, `всего ${s.users.total} · триал ${s.users.trial} · заблок. ${s.users.blocked}`)
+      + statCard('Новые', '+' + s.users.newDay, `за сутки · за неделю +${s.users.newWeek}`)
+      + statCard('Ноды онлайн', s.nodes.online + ' / ' + s.nodes.total, s.nodes.online < s.nodes.total ? '⚠️ есть офлайн' : 'все в строю')
+      + statCard('Устройств', s.devices, 'выданных ключей')
+      + '</div>'
+      + '<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:12px">'
+      + statCard('Доход за сутки', money(s.revenue.day), '')
+      + statCard('За неделю', money(s.revenue.week), '')
+      + statCard('За 30 дней', money(s.revenue.month), '')
+      + statCard('Всего получено', money(s.revenue.total), 'оплата с баланса не считается повторно')
+      + '</div>'
+      + '<div class="card"><b>Доход и регистрации · 14 дней</b>'
+      + '<div class="mut" style="font-size:12px;margin:4px 0 8px">Столбцы — доход (₽), линия — новые клиенты</div>'
+      + miniChart(s.chart) + '</div>'
+      + '<div class="card"><b>Последние платежи</b>'
+      + (s.recent.length ? '<table><tr><th>Клиент</th><th>Сумма</th><th>Способ</th><th>Когда</th></tr>'
+        + s.recent.map((p) => `<tr><td>${esc(p.name)}</td><td>${money(p.amount)}${p.topup ? ' <span class="pill">пополнение</span>' : ''}</td>`
+          + `<td class="mut">${esc(p.method)}</td><td class="mut">${p.paidAt ? new Date(p.paidAt).toLocaleString() : '—'}</td></tr>`).join('') + '</table>'
+        : '<div class="mut">пока нет</div>') + '</div>';
+  } catch (e) { el.innerHTML = '<div class="mut">' + esc(e.message) + '</div>'; }
+};
 
 // ── НОДЫ ─────────────────────────────────────────────────────────────────────
 const PROTOS = ['reality-tcp', 'reality-grpc', 'hysteria2', 'xhttp'];

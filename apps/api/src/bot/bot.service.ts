@@ -275,9 +275,9 @@ export class BotService implements OnModuleInit {
       ? `\n📺 <b>Для телевизора</b> (Android TV): короткий адрес\n<code>${base}/t/${(device as any).tvCode}</code>\n`
       : '';
     await tg.sendMessage(this.token, chatId,
-      `Ваша ссылка-подписка:\n<code>${link}</code>\n\n` +
-      `Умный конфиг (RU напрямую, YouTube без рекламы):\n<code>${smart}</code>\n${tvLine}\n` +
-      `Добавьте ссылку в приложение (v2rayNG / Streisand / Hiddify).`);
+      `🔗 <b>Ваша ссылка</b> (умная: RU напрямую, YouTube без рекламы):\n<code>${smart}</code>\n${tvLine}\n` +
+      `Добавьте её в приложение: Happ / v2rayNG / Streisand / Hiddify.\n\n` +
+      `<i>Обычная (весь трафик через VPN): <code>${link}</code></i>`);
   }
 
   private async sendAccount(chatId: number, user: any) {

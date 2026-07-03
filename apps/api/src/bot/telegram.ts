@@ -19,9 +19,11 @@ export const tg = {
     const j = await r.json();
     return j.ok ? j.result : [];
   },
-  sendMessage(token: string, chatId: number | string, text: string, buttons?: InlineButton[][]) {
+  // entities заданы → шлём как есть (сохраняются премиум-эмодзи); иначе parse_mode HTML
+  sendMessage(token: string, chatId: number | string, text: string, buttons?: InlineButton[][], entities?: any[]) {
     return call(token, 'sendMessage', {
-      chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true,
+      chat_id: chatId, text, disable_web_page_preview: true,
+      ...(entities && entities.length ? { entities } : { parse_mode: 'HTML' }),
       ...(buttons ? { reply_markup: { inline_keyboard: buttons } } : {}),
     });
   },

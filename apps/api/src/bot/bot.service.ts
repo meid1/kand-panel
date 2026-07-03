@@ -7,6 +7,7 @@ import { PaymentsService } from '../payments/payments.service';
 import { BypassService } from '../bypass/bypass.service';
 import { ReferralService } from '../referral/referral.service';
 import { PlansService } from '../plans/plans.service';
+import { BroadcastService } from '../broadcast/broadcast.service';
 import { tg, InlineButton } from './telegram';
 
 /**
@@ -31,7 +32,48 @@ export class BotService implements OnModuleInit {
     private bypass: BypassService,
     private referral: ReferralService,
     private plans: PlansService,
+    private broadcast: BroadcastService,
   ) {}
+
+  // владелец в состоянии ввода (chatId → что вводит): welcome | broadcast
+  private awaiting = new Map<number, string>();
+  private async isOwner(tgId: number): Promise<boolean> {
+    const v = (await this.prisma.setting.findUnique({ where: { key: 'owner.tg_id' } }))?.value;
+    return !!v && String(v) === String(tgId);
+  }
+  // приветствие с сохранёнными премиум-эмодзи (entities) или обычное (с подстановкой)
+  private async sendWelcomeMsg(chatId: number, buttons?: InlineButton[][]) {
+    const entRaw = (await this.prisma.setting.findUnique({ where: { key: 'text.welcome.entities' } }))?.value;
+    if (entRaw) {
+      const text = await this.settings.getText('text.welcome');
+      let entities: any[] = []; try { entities = JSON.parse(entRaw); } catch { /* */ }
+      return tg.sendMessage(this.token, chatId, text, buttons, entities);
+    }
+    const welcome = await this.subst(await this.settings.getText('text.welcome'));
+    return tg.sendMessage(this.token, chatId, welcome, buttons);
+  }
+
+  private ownerMenu(chatId: number) {
+    return tg.sendMessage(this.token, chatId, '🛠 <b>Админка бота</b>\nЗдесь можно задать приветствие и рассылку С ПРЕМИУМ-ЭМОДЗИ (их нельзя ввести в веб-панели).', [
+      [{ text: '✏️ Задать приветствие', callback_data: 'oa:welcome' }],
+      [{ text: '📢 Рассылка всем', callback_data: 'oa:broadcast' }],
+    ]);
+  }
+
+  private async captureOwnerInput(msg: any) {
+    const chatId = msg.chat.id;
+    const field = this.awaiting.get(chatId);
+    this.awaiting.delete(chatId);
+    if (field === 'welcome') {
+      await this.prisma.setting.upsert({ where: { key: 'text.welcome' }, update: { value: msg.text }, create: { key: 'text.welcome', value: msg.text } });
+      await this.prisma.setting.upsert({ where: { key: 'text.welcome.entities' }, update: { value: JSON.stringify(msg.entities || []) }, create: { key: 'text.welcome.entities', value: JSON.stringify(msg.entities || []) } });
+      return tg.sendMessage(this.token, chatId, '✅ Приветствие обновлено (премиум-эмодзи и форматирование сохранены).');
+    }
+    if (field === 'broadcast') {
+      const r = await this.broadcast.start({ fromChatId: chatId, messageId: msg.message_id }).catch((e: any) => ({ error: e.message }));
+      return tg.sendMessage(this.token, chatId, (r as any).error ? `Ошибка: ${(r as any).error}` : `📢 Рассылка запущена: получателей ${(r as any).total}. Премиум-эмодзи/медиа сохранятся (копия сообщения).`);
+    }
+  }
 
   async onModuleInit() {
     const s = await this.prisma.setting.findUnique({ where: { key: 'bot.token' } });
@@ -141,13 +183,16 @@ export class BotService implements OnModuleInit {
   private async onMessage(msg: any) {
     const from = msg.from;
     const { user, isNew } = await this.users.ensure(from.id, { username: from.username, name: [from.first_name, from.last_name].filter(Boolean).join(' ') });
+    // владелец в режиме ввода (приветствие/рассылка) — перехватываем сообщение
+    if (this.awaiting.has(msg.chat.id) && await this.isOwner(from.id)) return this.captureOwnerInput(msg);
+    // вход в админку бота (только владелец)
+    if ((msg.text === '/admin' || msg.text === '/owner') && await this.isOwner(from.id)) return this.ownerMenu(msg.chat.id);
     if (msg.text.startsWith('/start') || msg.text.startsWith('/menu')) {
       // реф-ссылка: /start ref_<code> → привязать пригласившего (только для новых)
       const m = msg.text.match(/\/start\s+ref_(\w+)/);
       if (m && isNew) await this.referral.link(user.id, m[1]).catch(() => {});
       if (!(await this.gates(msg.chat.id, user, from.id))) return;
-      const welcome = await this.subst(await this.settings.getText('text.welcome'));
-      await tg.sendMessage(this.token, msg.chat.id, welcome, await this.menu());
+      await this.sendWelcomeMsg(msg.chat.id, await this.menu());
     } else {
       // свободный текст → показываем меню (поддержка только по кнопке)
       await tg.sendMessage(this.token, msg.chat.id, await this.subst('Меню {brand}:'), await this.menu());
@@ -160,19 +205,26 @@ export class BotService implements OnModuleInit {
     const { user } = await this.users.ensure(cb.from.id, { username: cb.from.username });
     await tg.answerCallback(this.token, cb.id);
 
+    // owner-админка внутри бота (задать приветствие/рассылку с премиум-эмодзи)
+    if (data === 'oa:welcome' && await this.isOwner(cb.from.id)) {
+      this.awaiting.set(chatId, 'welcome');
+      return tg.sendMessage(this.token, chatId, 'Пришли новое приветствие (можно с премиум-эмодзи и форматированием):');
+    }
+    if (data === 'oa:broadcast' && await this.isOwner(cb.from.id)) {
+      this.awaiting.set(chatId, 'broadcast');
+      return tg.sendMessage(this.token, chatId, 'Пришли сообщение для рассылки (можно с премиум-эмодзи/медиа) — разошлю копию всем:');
+    }
     // согласие с условиями
     if (data === 'agree') {
       await this.prisma.user.update({ where: { id: user.id }, data: { agreedTerms: true } });
       const u2 = { ...user, agreedTerms: true };
       if (!(await this.gates(chatId, u2, cb.from.id))) return;
-      const welcome = await this.subst(await this.settings.getText('text.welcome'));
-      return tg.sendMessage(this.token, chatId, welcome, await this.menu());
+      return this.sendWelcomeMsg(chatId, await this.menu());
     }
     // повторная проверка обязательной подписки
     if (data === 'checksub') {
       if (!(await this.gates(chatId, user, cb.from.id))) return;
-      const welcome = await this.subst(await this.settings.getText('text.welcome'));
-      return tg.sendMessage(this.token, chatId, welcome, await this.menu());
+      return this.sendWelcomeMsg(chatId, await this.menu());
     }
     // остальные действия — только после прохождения гейтов
     if (!(await this.gates(chatId, user, cb.from.id))) return;

@@ -88,6 +88,7 @@ model Node {
   showInSub    Boolean  @default(true)
   sortOrder    Int      @default(0)
   role         String   @default("exit") // exit | bypass-origin | yt-ru | warp
+  warpKey      String?  // приватный WG-ключ WARP (чистый IP для нейросетей); null = WARP выкл
   trafficLimitGb Int?
   online       Boolean  @default(false)
   lastCheck    DateTime?

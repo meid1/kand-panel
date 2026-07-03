@@ -32,6 +32,9 @@ export class CreateNodeDto {
 
   @IsOptional() @IsBoolean() showInSub?: boolean;
 
+  // WARP: чистый IP Cloudflare для нейросетей (ИИ-домены → WARP на ноде)
+  @IsOptional() @IsBoolean() warp?: boolean;
+
   // привязка к тенанту (BYON франшизы); пусто = общий пул платформы
   @IsOptional() @IsString() tenantId?: string;
 }

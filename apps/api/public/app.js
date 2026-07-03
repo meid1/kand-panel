@@ -72,6 +72,7 @@ RENDER.nodes = async function () {
     + '<option value="exit">Обычный выход (VPN)</option>'
     + '<option value="yt-ru">YouTube-РФ (без рекламы)</option>'
     + '<option value="bypass-origin">Origin для обхода</option></select>'
+    + '<div class="row" style="margin-top:8px"><label class="pill"><input type="checkbox" id="n_warp" style="width:auto;margin:0 6px 0 0">🤖 WARP — чистый IP для нейросетей (ChatGPT/Claude/Gemini)</label></div>'
     + '<div style="margin-top:10px"><button class="btn" onclick="addNode()">Создать и получить команду</button></div>'
     + '<div id="n_install"></div></div><div class="card"><b>Ноды</b><div id="n_list" class="mut">загрузка…</div></div>';
   try {
@@ -92,6 +93,7 @@ async function addNode() {
     ip: document.getElementById('n_ip').value.trim(),
     protocols,
     role: document.getElementById('n_role').value,
+    warp: document.getElementById('n_warp').checked,
   };
   if (!body.label || !body.address || !body.ip || !protocols.length) return toast('заполни все поля и протоколы');
   try {

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { generateKeyPairSync, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
+import { WarpService } from '../warp/warp.service';
 import { CreateNodeDto, Protocol } from './dto/create-node.dto';
 import { UpdateNodeDto } from './dto/update-node.dto';
 
@@ -19,6 +20,7 @@ export class NodesService {
     private prisma: PrismaService,
     private crypto: CryptoService,
     private config: ConfigService,
+    private warp: WarpService,
   ) {}
 
   // ── Reality X25519: xray ждёт base64url(raw 32 байта) ────────────────────
@@ -66,9 +68,13 @@ export class NodesService {
     const caPem = await this.crypto.getCaCertPem();
     const jwt = await this.crypto.getNodeJwtSecret();
 
+    // WARP (чистый IP для нейросетей): регистрируем ключ, если включено
+    let warpKey: string | null = null;
+    if (dto.warp) warpKey = await this.warp.register();
+
     // ПОЛНЫЙ базовый xray-конфиг ноды кладём в bundle — установщик просто пишет
     // его на диск, ничего сам не собирает (dumb installer = меньше багов).
-    const xray = this.buildXrayConfig(ibs, reality.pvk, sid, sni);
+    const xray = this.buildXrayConfig(ibs, reality.pvk, sid, sni, warpKey);
 
     const bundle = Buffer.from(
       JSON.stringify({
@@ -94,6 +100,7 @@ export class NodesService {
         realitySid: sid,
         secretKey: bundle,
         role: dto.role ?? 'exit',
+        warpKey,
         trafficLimitGb: dto.trafficLimitGb ?? null,
         showInSub: dto.showInSub ?? true,
         inbounds: {
@@ -108,10 +115,10 @@ export class NodesService {
     return { node: this.strip(node), install };
   }
 
-  /** Базовый xray-конфиг: reality/xhttp-инбаунды + api + routing. */
+  /** Базовый xray-конфиг: reality/xhttp-инбаунды + api + routing (+ WARP если задан). */
   private buildXrayConfig(
     ibs: { tag: string; protocol: string; network: string; port: number }[],
-    pvk: string, sid: string, sni: string,
+    pvk: string, sid: string, sni: string, warpKey?: string | null,
   ) {
     const dest = `${sni}:443`;
     const inbounds: any[] = [];
@@ -149,8 +156,16 @@ export class NodesService {
       outbounds: [
         { protocol: 'freedom', tag: 'direct' },
         { protocol: 'blackhole', tag: 'block' },
+        // WARP-outbound (чистый IP Cloudflare для нейросетей)
+        ...(warpKey ? [this.warp.outbound(warpKey)] : []),
       ],
-      routing: { rules: [{ type: 'field', inboundTag: ['api'], outboundTag: 'api' }] },
+      routing: {
+        rules: [
+          { type: 'field', inboundTag: ['api'], outboundTag: 'api' },
+          // ИИ-домены → WARP (чтобы нейросети видели чистый IP, без капчи)
+          ...(warpKey ? [this.warp.aiRule()] : []),
+        ],
+      },
     };
   }
 
@@ -207,7 +222,8 @@ export class NodesService {
 
   /** Убираем секреты из ответа API (secretKey/pvk никогда не отдаём в UI). */
   private strip(n: any) {
-    const { secretKey, ...safe } = n;
+    const { secretKey, warpKey, ...safe } = n; // секреты наружу не отдаём
+    (safe as any).warp = !!warpKey; // но флаг «WARP включён» показываем
     return safe;
   }
 }

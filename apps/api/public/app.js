@@ -42,9 +42,16 @@ function logout() {
   document.getElementById('app').classList.add('hidden');
   document.getElementById('login').classList.remove('hidden');
 }
-function showApp() {
+async function showApp() {
   document.getElementById('login').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
+  // скрыть неактуальные вкладки (настройка ui.hidden_tabs) — напр. в гибриде
+  try {
+    const s = await api('/settings/texts');
+    (s.hiddenTabs || '').split(',').map((x) => x.trim()).filter(Boolean).forEach((t) => {
+      document.querySelectorAll(`nav button[data-tab="${t}"]`).forEach((b) => { b.style.display = 'none'; });
+    });
+  } catch (e) { /* норм */ }
   switchTab('dashboard');
 }
 

@@ -38,6 +38,7 @@ export class SettingsService {
     return {
       brand: await this.brand(),
       support: await this.support(),
+      hiddenTabs: (await this.raw('ui.hidden_tabs')) || '', // скрыть неактуальные вкладки (напр. в гибриде)
       texts: TEXTS.map((t) => ({
         key: t.key,
         title: t.title,

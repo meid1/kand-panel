@@ -13,8 +13,13 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
   // helmet с ослабленным CSP — админка использует инлайновый скрипт/стили
   app.use(helmet({ contentSecurityPolicy: false }));
-  // статика веб-админки (index.html + app.js)
-  app.useStaticAssets(join(process.env.VPANEL_ROOT || '/opt/vpanel', 'apps/api/public'));
+  // статика веб-админки (index.html + app.js). no-cache для html/js — чтобы
+  // обновления интерфейса сразу доходили до пользователя (иначе телефон кэширует).
+  app.useStaticAssets(join(process.env.VPANEL_ROOT || '/opt/vpanel', 'apps/api/public'), {
+    setHeaders: (res: any, path: string) => {
+      if (/\.(html|js)$/.test(path)) res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    },
+  });
   app.enableCors({ origin: process.env.CORS_ORIGIN?.split(',') ?? false });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   // публичные роуты без /api: подписка клиента и install-артефакты ноды

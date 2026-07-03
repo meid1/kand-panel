@@ -140,7 +140,11 @@ export class ImportService {
         const uuid = typeof d === 'string' ? d : d?.uuid;
         if (!uuid) continue;
         if (await this.prisma.device.findUnique({ where: { vlessUuid: uuid } })) continue;
-        await this.prisma.device.create({ data: { userId: user.id, name: 'Импорт', vlessUuid: uuid, subToken: randomBytes(24).toString('hex') } });
+        // Сохранение ссылки подписки: если задан subToken (напр. sub_id старой панели),
+        // берём его как есть — тогда у клиента ссылка не меняется. Иначе — случайный.
+        let subToken = (typeof d === 'object' && d?.subToken) ? String(d.subToken) : randomBytes(24).toString('hex');
+        if (await this.prisma.device.findUnique({ where: { subToken } })) subToken = randomBytes(24).toString('hex');
+        await this.prisma.device.create({ data: { userId: user.id, name: 'Импорт', vlessUuid: uuid, subToken } });
         devices++;
       }
     }

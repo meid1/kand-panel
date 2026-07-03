@@ -67,7 +67,9 @@ export class MonitoringService {
       if (!u.tgId || u.tgId <= 0n) continue;
       const daysLeft = Math.ceil((u.expireAt!.getTime() - now) / DAY);
       let stage = 0, text = '';
-      if (daysLeft < 0 && u.remindStage < 3) { stage = 3; text = `Ваша подписка ${brand} истекла. Продлите доступ в боте, чтобы снова пользоваться VPN.`; }
+      // winback: истёк ≥3 дней назад и ещё не возвращали (стадия 4)
+      if (daysLeft <= -3 && u.remindStage < 4) { stage = 4; text = `Скучаем! 💙 Возвращайся в ${brand} — продли подписку в боте и снова пользуйся VPN. Может, дадим бонус 🎁`; }
+      else if (daysLeft < 0 && u.remindStage < 3) { stage = 3; text = `Ваша подписка ${brand} истекла. Продлите доступ в боте, чтобы снова пользоваться VPN.`; }
       else if (daysLeft <= 1 && daysLeft >= 0 && u.remindStage < 2) { stage = 2; text = `⏳ Подписка ${brand} истекает ${daysLeft === 0 ? 'сегодня' : 'завтра'}. Продлите, чтобы не потерять доступ.`; }
       else if (daysLeft <= 3 && daysLeft > 1 && u.remindStage < 1) { stage = 1; text = `🔔 Подписка ${brand} истекает через ${daysLeft} дн. Не забудьте продлить.`; }
       if (stage) {

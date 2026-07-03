@@ -61,11 +61,17 @@ export class MonitoringService {
     const now = Date.now();
     const users = await this.prisma.user.findMany({
       where: { isBlocked: false, expireAt: { not: null } },
-      select: { id: true, tgId: true, expireAt: true, remindStage: true },
+      select: { id: true, tgId: true, expireAt: true, remindStage: true,
+        autoRenew: true, autoRenewPlanId: true, balance: true },
     });
     for (const u of users) {
       if (!u.tgId || u.tgId <= 0n) continue;
-      const daysLeft = Math.ceil((u.expireAt!.getTime() - now) / DAY);
+      let daysLeft = Math.ceil((u.expireAt!.getTime() - now) / DAY);
+      // автопродление с баланса (клиент включил сам): списываем и продлеваем
+      if (u.autoRenew && u.autoRenewPlanId && daysLeft <= 1) {
+        const renewed = await this.tryAutoRenew(u as any, token, brand);
+        if (renewed != null) continue; // продлили — напоминания не нужны
+      }
       let stage = 0, text = '';
       // winback: истёк ≥3 дней назад и ещё не возвращали (стадия 4)
       if (daysLeft <= -3 && u.remindStage < 4) { stage = 4; text = `Скучаем! 💙 Возвращайся в ${brand} — продли подписку в боте и снова пользуйся VPN. Может, дадим бонус 🎁`; }
@@ -77,6 +83,37 @@ export class MonitoringService {
         await this.prisma.user.update({ where: { id: u.id }, data: { remindStage: stage } });
       }
     }
+  }
+
+  /**
+   * Автопродление с баланса. Возвращает новый daysLeft при успехе, иначе null
+   * (нет тарифа / не хватило денег — тогда идут обычные напоминания).
+   * Списание с баланса НЕ создаёт Payment (баланс уже был учтён как доход при
+   * пополнении) — «авто ≠ доход», без двойного счёта.
+   */
+  private async tryAutoRenew(
+    u: { id: string; tgId: bigint; expireAt: Date | null; autoRenewPlanId: string | null; balance: any },
+    token: string, brand: string,
+  ): Promise<number | null> {
+    const plan = u.autoRenewPlanId
+      ? await this.prisma.plan.findUnique({ where: { id: u.autoRenewPlanId } }) : null;
+    if (!plan || !plan.isActive) return null;
+    const price = Number(plan.price);
+    if (Number(u.balance) < price) {
+      // не хватило — один раз подскажем пополнить (используем стадию напоминания)
+      await this.notify(token, u.tgId.toString(),
+        `⚠️ Автопродление ${brand}: на балансе не хватает ${price}₽ для тарифа «${plan.title}». Пополните баланс в боте, чтобы продлить автоматически.`);
+      return null;
+    }
+    const base = u.expireAt && u.expireAt.getTime() > Date.now() ? u.expireAt.getTime() : Date.now();
+    const next = new Date(base + plan.days * DAY);
+    await this.prisma.user.update({
+      where: { id: u.id },
+      data: { balance: { decrement: price }, expireAt: next, isTrial: false, remindStage: 0 },
+    });
+    await this.notify(token, u.tgId.toString(),
+      `✅ Автопродление ${brand}: списано ${price}₽ с баланса, тариф «${plan.title}» продлён до ${next.toLocaleDateString('ru-RU')}.`);
+    return Math.ceil((next.getTime() - Date.now()) / DAY);
   }
 
   /** Ручной прогон (для теста/кнопки). */

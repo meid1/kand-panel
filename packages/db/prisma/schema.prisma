@@ -1,4 +1,4 @@
-// VPanel — схема БД (PostgreSQL). Draft v1 (Фаза 0). Мультитенант + наши фишки.
+// Kand — схема БД (PostgreSQL). Мультитенант + умная маршрутизация и метринг обхода.
 generator client {
   provider = "prisma-client-js"
 }
@@ -49,6 +49,7 @@ model User {
   trialUsed    Boolean  @default(false)
   isBlocked    Boolean  @default(false)
   autoRenew    Boolean  @default(false)
+  autoRenewPlanId String? // какой тариф списывать с баланса при автопродлении
   balance      Decimal  @default(0)
   createdAt    DateTime @default(now())
   devices      Device[]

@@ -255,6 +255,16 @@ export class BotService implements OnModuleInit {
       catch (e: any) { return tg.sendMessage(this.token, chatId, `❌ ${e.message}`, await this.menu()); }
     }
     if (data.startsWith('buy:')) return this.createInvoice(chatId, user, data.slice(4));
+    if (data === 'autopay') return this.sendAutopay(chatId, user);
+    if (data === 'ap:off') {
+      await this.prisma.user.update({ where: { id: user.id }, data: { autoRenew: false } });
+      return tg.sendMessage(this.token, chatId, '⛔ Автопродление выключено.', await this.menu());
+    }
+    if (data.startsWith('ap:set:')) {
+      const planId = data.slice(7);
+      await this.prisma.user.update({ where: { id: user.id }, data: { autoRenew: true, autoRenewPlanId: planId } });
+      return tg.sendMessage(this.token, chatId, '✅ Автопродление включено. При истечении подписки спишем с баланса и продлим. Не забудьте держать баланс пополненным.', await this.menu());
+    }
     if (data === 'referral') return this.sendReferral(chatId, user);
     if (data === 'promo') { this.awaiting.set(chatId, 'promo'); return tg.sendMessage(this.token, chatId, '🎁 Пришлите промокод одним сообщением:'); }
     // кастомная кнопка с действием «показать текст»
@@ -308,7 +318,24 @@ export class BotService implements OnModuleInit {
     const txt = await this.subst(await this.settings.getText('text.account'), { expire: exp });
     const bal = Number(user.balance || 0);
     const balLine = bal > 0 ? `\n💰 Баланс: <b>${bal}₽</b>` : '';
-    await tg.sendMessage(this.token, chatId, `${txt}\n${bypassLine}${balLine}`, await this.menu());
+    const apLine = user.autoRenew ? '\n🔁 Автопродление: <b>включено</b>' : '';
+    const kb = [[{ text: user.autoRenew ? '🔁 Автопродление: вкл' : '🔁 Настроить автопродление', callback_data: 'autopay' }]];
+    await tg.sendMessage(this.token, chatId, `${txt}\n${bypassLine}${balLine}${apLine}`, kb);
+  }
+
+  // Автопродление (клиент включает сам). Списываем с баланса при истечении.
+  private async sendAutopay(chatId: number, user: any) {
+    const plans = await this.plans.list(user.tenantId);
+    if (!plans.length) {
+      return tg.sendMessage(this.token, chatId, 'Автопродление недоступно — нет тарифов. Обратитесь в поддержку.');
+    }
+    const cur = user.autoRenewPlanId ? plans.find((p: any) => p.id === user.autoRenewPlanId) : null;
+    const status = user.autoRenew && cur
+      ? `🔁 Включено: тариф «${cur.title}» (${Number(cur.price)}₽). При истечении спишем с баланса и продлим.`
+      : 'Автопродление выключено. Выберите тариф — при истечении подписки сумма спишется с баланса автоматически (пополнить баланс можно в разделе оплаты).';
+    const rows = plans.map((p: any) => [{ text: `${p.title} — ${Number(p.price)}₽`, callback_data: `ap:set:${p.id}` }]);
+    if (user.autoRenew) rows.push([{ text: '⛔ Выключить автопродление', callback_data: 'ap:off' }]);
+    await tg.sendMessage(this.token, chatId, status, rows);
   }
 
   private async sendTrial(chatId: number, user: any) {

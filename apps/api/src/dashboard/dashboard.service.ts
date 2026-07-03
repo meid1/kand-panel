@@ -29,7 +29,10 @@ export class DashboardService {
       this.prisma.device.count({ where: tenantId ? { user: { tenantId } } : {} }),
       this.prisma.node.count({ where: tenantId ? { tenantId } : {} }),
       this.prisma.node.count({ where: { ...(tenantId ? { tenantId } : {}), online: true } }),
-      this.prisma.user.count({ where: { ...T, devices: { some: {} } } }),              // «получили доступ»
+      // «получили доступ» = завели ключ (устройство в Kand) ИЛИ есть подписка (expireAt задан).
+      // В гибриде устройства живут во внешнем cdn_api, поэтому по одному Device выходило меньше,
+      // чем «оплатили» — а оплативший всегда получал доступ. Учитываем и подписку.
+      this.prisma.user.count({ where: { ...T, OR: [{ devices: { some: {} } }, { expireAt: { not: null } }] } }),
       this.prisma.user.count({ where: { ...T, expireAt: { gte: monthAgo, lt: now } } }), // истекли за месяц (отток)
     ]);
 

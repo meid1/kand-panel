@@ -88,4 +88,9 @@ export class NodeAgentClient {
   stats(ip: string, port: number, reset = true) {
     return this.request(ip, port, 'GET', `/stats?reset=${reset ? 1 : 0}`);
   }
+
+  /** POST /config — обновить базовый xray-конфиг ноды (валидация+рестарт на ноде). */
+  setConfig(ip: string, port: number, config: any) {
+    return this.request(ip, port, 'POST', '/config', { config });
+  }
 }

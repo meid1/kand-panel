@@ -53,6 +53,21 @@ func (c *ConfigManager) atomicWrite(m map[string]any) error {
 	return os.Rename(tmp, c.path)
 }
 
+// ApplyBase — записать НОВЫЙ базовый конфиг (панель прислала обновление). Валидация
+// через xray -test, затем атомарная запись. Клиенты в присланном конфиге пустые —
+// панель после этого зовёт /apply и восстанавливает пользователей. При невалидном
+// конфиге ничего не пишем (нода продолжает работать на старом).
+func (c *ConfigManager) ApplyBase(raw []byte, bin string) error {
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return err
+	}
+	if err := validate(bin, string(raw)); err != nil {
+		return err
+	}
+	return c.atomicWrite(m)
+}
+
 // structuralHash — хеш inbounds/outbounds/routing БЕЗ clients (чтобы рестартить
 // xray только при смене структуры, а не при каждом юзере).
 func structuralHash(m map[string]any) string {

@@ -80,11 +80,41 @@ RENDER.nodes = async function () {
     document.getElementById('n_list').innerHTML = nodes.length ? '<table><tr><th>Нода</th><th>Хост</th><th>Протоколы</th><th></th></tr>'
       + nodes.map((n) => `<tr><td>${esc(n.label)} ${n.isActive ? '<span class="pill ok">вкл</span>' : '<span class="pill bad">выкл</span>'} ${n.online ? '<span class="pill ok">online</span>' : ''}</td>`
         + `<td class="mut">${esc(n.address)}<br>${esc(n.ip)}</td><td class="mut">${(n.protocols || []).join(', ')}</td>`
-        + `<td class="row"><button class="btn sec sm" onclick="toggleNode('${n.id}',${!n.isActive})">${n.isActive ? 'выкл' : 'вкл'}</button>`
+        + `<td class="row"><button class="btn sec sm" onclick="editCfg('${n.id}')">⚙ конфиг</button>`
+        + `<button class="btn sec sm" onclick="manualNode('${n.id}')">🔧 ручная</button>`
+        + `<button class="btn sec sm" onclick="toggleNode('${n.id}',${!n.isActive})">${n.isActive ? 'выкл' : 'вкл'}</button>`
         + `<button class="btn bad sm" onclick="delNode('${n.id}')">×</button></td></tr>`).join('') + '</table>'
+        + '<div id="n_editor"></div>'
       : '<span class="mut">пока нет нод</span>';
   } catch (e) { document.getElementById('n_list').textContent = e.message; }
 };
+async function editCfg(id) {
+  try {
+    const cfg = await api('/nodes/' + id + '/config');
+    const box = document.getElementById('n_editor');
+    box.innerHTML = '<div class="card"><b>Конфиг ноды (xray)</b><div class="mut">Правь и сохрани — конфиг запушится на установленный сервер (с рестартом xray) и восстановит клиентов.</div>'
+      + `<textarea id="cfg_area" style="min-height:280px;font-family:monospace;font-size:12px">${esc(JSON.stringify(cfg, null, 1))}</textarea>`
+      + `<div class="row"><button class="btn" onclick="saveCfg('${id}')">Сохранить и запушить</button><button class="btn sec" onclick="document.getElementById('n_editor').innerHTML=''">Отмена</button></div></div>`;
+    box.scrollIntoView({ behavior: 'smooth' });
+  } catch (e) { toast(e.message); }
+}
+async function saveCfg(id) {
+  let config; try { config = JSON.parse(document.getElementById('cfg_area').value); } catch (e) { return toast('невалидный JSON'); }
+  try { const r = await api('/nodes/' + id + '/config', { method: 'PUT', body: JSON.stringify({ config }) }); toast(r.pushed ? 'сохранено и запушено на сервер' : 'сохранено (сервер офлайн — применится позже)'); } catch (e) { toast(e.message); }
+}
+async function manualNode(id) {
+  try {
+    const m = await api('/nodes/' + id + '/manual');
+    const box = document.getElementById('n_editor');
+    box.innerHTML = '<div class="card"><b>Ручная установка ноды</b><div class="mut">Если не хочешь ставить одной командой — поставь xray + vpanel-agent сам и разложи это:</div>'
+      + `<label class="fld">Порт агента</label><code>${m.agentPort}</code>`
+      + `<label class="fld">AGENT_JWT_SECRET (env агента)</label><code>${esc(m.env.AGENT_JWT_SECRET)}</code>`
+      + Object.entries(m.files).map(([p, c]) => `<label class="fld">${esc(p)}</label><textarea style="min-height:70px;font-size:11px">${esc(c)}</textarea>`).join('')
+      + `<label class="fld">/usr/local/etc/xray/config.json</label><textarea style="min-height:160px;font-family:monospace;font-size:11px">${esc(JSON.stringify(m.xrayConfig, null, 1))}</textarea>`
+      + `<div class="mut">${esc(m.hint)}</div><button class="btn sec" onclick="document.getElementById('n_editor').innerHTML=''" style="margin-top:8px">Закрыть</button></div>`;
+    box.scrollIntoView({ behavior: 'smooth' });
+  } catch (e) { toast(e.message); }
+}
 async function addNode() {
   const protocols = [...document.querySelectorAll('#n_protos input:checked')].map((i) => i.value);
   const body = {

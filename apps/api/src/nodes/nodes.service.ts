@@ -4,6 +4,8 @@ import { generateKeyPairSync, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
 import { WarpService } from '../warp/warp.service';
+import { NodeAgentClient } from '../nodes-agent/node-agent.client';
+import { ReconcileService } from '../reconcile/reconcile.service';
 import { CreateNodeDto, Protocol } from './dto/create-node.dto';
 import { UpdateNodeDto } from './dto/update-node.dto';
 
@@ -21,6 +23,8 @@ export class NodesService {
     private crypto: CryptoService,
     private config: ConfigService,
     private warp: WarpService,
+    private agent: NodeAgentClient,
+    private reconcile: ReconcileService,
   ) {}
 
   // ── Reality X25519: xray ждёт base64url(raw 32 байта) ────────────────────
@@ -208,6 +212,55 @@ export class NodesService {
     await this.prisma.inbound.deleteMany({ where: { nodeId: id } });
     await this.prisma.node.delete({ where: { id } });
     return { ok: true };
+  }
+
+  // ── правка конфига установленных нод + ручные материалы ──────────────────
+  private decodeBundle(secretKey: string): any {
+    try { return JSON.parse(Buffer.from(secretKey, 'base64').toString()); } catch { return {}; }
+  }
+
+  /** Текущий xray-конфиг ноды (для просмотра/правки). */
+  async getConfig(id: string) {
+    const n = await this.prisma.node.findUnique({ where: { id } });
+    if (!n) throw new NotFoundException('нода не найдена');
+    return this.decodeBundle(n.secretKey).xray || {};
+  }
+
+  /** Заменить xray-конфиг: сохранить в bundle + запушить на агент + восстановить клиентов. */
+  async setConfig(id: string, config: any) {
+    const n = await this.prisma.node.findUnique({ where: { id } });
+    if (!n) throw new NotFoundException('нода не найдена');
+    const bundle = this.decodeBundle(n.secretKey);
+    bundle.xray = config;
+    await this.prisma.node.update({
+      where: { id }, data: { secretKey: Buffer.from(JSON.stringify(bundle)).toString('base64') },
+    });
+    // пуш на живой агент (если нода поднята); затем восстановить ключи клиентов
+    let pushed = false, error: string | undefined;
+    try {
+      await this.agent.setConfig(n.ip, bundle.agent_port || 8443, config);
+      await this.reconcile.reconcileNode(id);
+      pushed = true;
+    } catch (e: any) { error = String(e.message || e); }
+    return { ok: true, pushed, error };
+  }
+
+  /** Материалы для РУЧНОЙ установки ноды (админ ставит сам, без curl|bash). */
+  async manual(id: string) {
+    const n = await this.prisma.node.findUnique({ where: { id } });
+    if (!n) throw new NotFoundException('нода не найдена');
+    const b = this.decodeBundle(n.secretKey);
+    return {
+      agentPort: b.agent_port || 8443,
+      files: {
+        '/etc/vpanel/agent.crt': b.cert,
+        '/etc/vpanel/agent.key': b.key,
+        '/etc/vpanel/ca.crt': b.ca,
+      },
+      env: { AGENT_JWT_SECRET: b.jwt },
+      xrayConfig: b.xray,
+      hint: 'Поставь xray + vpanel-agent, разложи файлы, задай AGENT_JWT_SECRET и порт, положи xrayConfig в /usr/local/etc/xray/config.json, запусти агент.',
+    };
   }
 
   /** Перестановка нод в подписке (drag-reorder в админке). */

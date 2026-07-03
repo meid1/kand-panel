@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BypassService } from '../bypass/bypass.service';
 
@@ -77,6 +77,39 @@ export class SubscriptionService {
       (user.expireAt != null && user.expireAt.getTime() < Date.now());
     const bypassSuspended = await this.bypass.isSuspended(user.id);
     return { device, user, brand, nodes, blocked, bypassSuspended };
+  }
+
+  /**
+   * HWID-лимит устройств: приложение (Happ/v2rayTun) шлёт заголовок x-hwid. Считаем
+   * уникальные HWID клиента; при превышении лимита (настройка hwid.limit, 0=выкл)
+   * НОВОЕ устройство не пускаем. Клиенты без hwid не блокируем (совместимость).
+   */
+  async hwidCheck(token: string, hwid?: string, os?: string, model?: string) {
+    const limRow = await this.prisma.setting.findUnique({ where: { key: 'hwid.limit' } });
+    const limit = limRow ? Number(limRow.value) || 0 : 0;
+    if (!limit || !hwid) return; // лимит выкл или клиент не прислал hwid
+    const device = await this.prisma.device.findUnique({ where: { subToken: token }, include: { user: true } });
+    if (!device) return;
+    const userId = device.userId;
+    const existing = await this.prisma.userHwid.findUnique({ where: { userId_hwid: { userId, hwid } } });
+    if (existing) {
+      await this.prisma.userHwid.update({ where: { id: existing.id }, data: { lastSeen: new Date() } });
+      return;
+    }
+    const count = await this.prisma.userHwid.count({ where: { userId } });
+    if (count >= limit) {
+      throw new ForbiddenException(`превышен лимит устройств (${limit}). Удалите старое устройство в поддержке.`);
+    }
+    await this.prisma.userHwid.create({ data: { userId, hwid, os, model } });
+  }
+
+  /** HWID-устройства клиента (для админки). */
+  async hwids(userId: string) {
+    return this.prisma.userHwid.findMany({ where: { userId }, orderBy: { lastSeen: 'desc' } });
+  }
+  async removeHwid(userId: string, id: string) {
+    await this.prisma.userHwid.deleteMany({ where: { id, userId } });
+    return { ok: true };
   }
 
   /** subToken по короткому ТВ-коду (для /t/<code>). */

@@ -169,10 +169,20 @@ async function openUser(id) {
       + `<button class="btn sm" onclick="bypassGb('${id}',true)">+ докупить</button>`
       + `<button class="btn sec sm" onclick="bypassGb('${id}',false)">− списать</button></div>`
       + `<div style="margin:6px 0"><button class="btn sec sm" onclick="diagnose('${id}')">🩺 Диагностика</button><span id="diag_${id}" class="mut" style="margin-left:8px"></span></div>`
-      + '<b class="mut">Устройства</b><table>' + (devs || '<tr><td class="mut">нет</td></tr>') + '</table>'
-      + `<button class="btn sec sm" style="margin-top:8px" onclick="addDevice('${id}')">+ устройство</button></div>`;
+      + '<b class="mut">Устройства (подписки)</b><table>' + (devs || '<tr><td class="mut">нет</td></tr>') + '</table>'
+      + `<button class="btn sec sm" style="margin-top:8px" onclick="addDevice('${id}')">+ устройство</button>`
+      + `<div id="hwids_${id}" class="mut" style="margin-top:10px"></div></div>`;
+    loadHwids(id);
   } catch (e) { toast(e.message); }
 }
+async function loadHwids(id) {
+  try {
+    const hw = await api('/users/' + id + '/hwids');
+    const box = document.getElementById('hwids_' + id); if (!box) return;
+    box.innerHTML = hw.length ? '<b>HWID-устройства:</b> ' + hw.map(h => `<span class="pill">${esc(h.hwid.slice(0, 12))}${h.os ? ' · ' + esc(h.os) : ''} <a href="#" onclick="delHwid('${id}','${h.id}');return false" style="color:var(--bad)">×</a></span>`).join(' ') : '';
+  } catch (e) {}
+}
+async function delHwid(id, hwidId) { try { await api('/users/' + id + '/hwids/' + hwidId, { method: 'DELETE' }); loadHwids(id); toast('устройство сброшено'); } catch (e) { toast(e.message); } }
 async function diagnose(id) {
   const box = document.getElementById('diag_' + id);
   box.textContent = 'проверяю…';

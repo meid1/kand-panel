@@ -163,6 +163,19 @@ model PromoCode {
   createdAt DateTime @default(now())
 }
 
+/// HWID-устройство клиента (аппаратный id из приложения) — для лимита устройств.
+model UserHwid {
+  id       String   @id @default(cuid())
+  userId   String
+  hwid     String
+  os       String?
+  model    String?
+  lastSeen DateTime @default(now())
+  createdAt DateTime @default(now())
+  @@unique([userId, hwid])
+  @@index([userId])
+}
+
 /// Погашение промокода клиентом (защита от повторного использования одним юзером).
 model PromoRedemption {
   id          String   @id @default(cuid())

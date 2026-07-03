@@ -9,6 +9,11 @@ services:
       POSTGRES_DB: kand
     volumes:
       - kand_pg:/var/lib/postgresql/data
+    healthcheck:               # чтобы api ждал готовности БД (иначе P1001 при старте)
+      test: ["CMD-SHELL", "pg_isready -U kand"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -19,9 +24,14 @@ services:
     restart: unless-stopped
     env_file: ../.env
     environment:
+      API_PORT: "3000"          # порт ВНУТРИ контейнера всегда 3000; наружу — через ports
       DATABASE_URL: postgresql://kand:${POSTGRES_PASSWORD:-kand}@postgres:5432/kand
       REDIS_URL: redis://redis:6379
-    depends_on: [postgres, redis]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     ports:
       - "${API_PORT:-3000}:3000"
 volumes:

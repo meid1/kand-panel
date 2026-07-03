@@ -29,6 +29,7 @@ import { PlansModule } from './plans/plans.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 import { PromoModule } from './promo/promo.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { MultibotModule } from './multibot/multibot.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     MonitoringModule,
     PromoModule,
     DashboardModule,
+    MultibotModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

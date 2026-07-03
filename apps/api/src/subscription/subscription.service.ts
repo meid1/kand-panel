@@ -5,7 +5,7 @@ import { BypassService } from '../bypass/bypass.service';
 /**
  * Генерация клиентской подписки по sub-токену устройства. Отдаёт base64-список
  * vless:// / hy2:// ссылок по всем нодам тенанта (showInSub, активные), с
- * Reality-параметрами. Бренд берётся из тенанта — НИКАКОГО хардкода MariusVPN.
+ * Reality-параметрами. Бренд берётся из тенанта — НИКАКОГО хардкода бренда.
  */
 @Injectable()
 export class SubscriptionService {

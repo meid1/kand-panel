@@ -99,7 +99,7 @@ export class UsersService {
     const next = new Date(0);
     next.setTime(base + days * 86400_000);
     return this.prisma.user.update({
-      where: { id }, data: { expireAt: next, isTrial: false },
+      where: { id }, data: { expireAt: next, isTrial: false, remindStage: 0 }, // продлили → напоминания заново
     });
   }
 

@@ -26,6 +26,7 @@ import { CabinetModule } from './cabinet/cabinet.module';
 import { ReferralModule } from './referral/referral.module';
 import { DiagnosticsModule } from './diagnostics/diagnostics.module';
 import { PlansModule } from './plans/plans.module';
+import { MonitoringModule } from './monitoring/monitoring.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { PlansModule } from './plans/plans.module';
     ReferralModule,
     DiagnosticsModule,
     PlansModule,
+    MonitoringModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes, randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -13,6 +13,13 @@ export class DevicesService {
   async create(userId: string, name?: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('пользователь не найден');
+    // лимит устройств на клиента (настройка device.limit; 0 = без лимита)
+    const limRow = await this.prisma.setting.findUnique({ where: { key: 'device.limit' } });
+    const limit = limRow ? Number(limRow.value) || 0 : 0;
+    if (limit > 0) {
+      const count = await this.prisma.device.count({ where: { userId } });
+      if (count >= limit) throw new BadRequestException(`достигнут лимит устройств (${limit})`);
+    }
     return this.prisma.device.create({
       data: {
         userId,

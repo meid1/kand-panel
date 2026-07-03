@@ -43,6 +43,7 @@ model User {
   refEarnedDays Int     @default(0) // сколько дней заработано на рефералах
   refFirstPay  Boolean  @default(false) // была ли уже первая оплата (чтобы наградить пригласившего 1 раз)
   agreedTerms  Boolean  @default(false) // согласие с условиями/офертой
+  remindStage  Int      @default(0) // напоминания об истечении: 0=нет,1=за3д,2=за1д,3=истекло
   expireAt     DateTime?
   isTrial      Boolean  @default(true)
   trialUsed    Boolean  @default(false)

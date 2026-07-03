@@ -1,5 +1,5 @@
 // Kand admin — vanilla JS, без сборки. Работает на статике, ходит в /api с JWT.
-const APP_VERSION = 'v0.9.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
+const APP_VERSION = 'v0.10.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
 const API = '/api';
 let TOKEN = localStorage.getItem('vp_token') || '';
 // показать версию (шапка + вход)
@@ -82,29 +82,53 @@ function statCard(label, value, sub, hint) {
 // дата ДД.ММ + значение для подсказки графика
 function fmtDay(iso) { const p = String(iso).split('-'); return p.length === 3 ? p[2] + '.' + p[1] : iso; }
 function chartTip(d, key, unit) { const v = unit === 'money' ? Number(d[key]).toLocaleString('ru-RU') + '₽' : d[key] + ' рег.'; return `${fmtDay(d.date)}: ${v}`; }
-// линия с заливкой + точки + колонки-наведения (показывают дату/значение)
+// подпись оси Y (число): 1200→1.2к
+function fmtAxis(v, unit) { v = Math.round(v); if (v >= 1000) return (v / 1000).toFixed(v >= 10000 ? 0 : 1).replace('.0', '') + 'к'; return String(v); }
+function chartAxes(max, n, data, unit, W, H, padL, padR, padT, padB) {
+  const ih = H - padT - padB, iw = W - padL - padR;
+  let g = '';
+  // сетка + подписи Y (4 деления)
+  [0, 1, 2, 3].forEach((k) => {
+    const v = max * (3 - k) / 3, y = (padT + ih * k / 3).toFixed(0);
+    g += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="var(--line)" stroke-width="1" opacity=".55"/>`;
+    g += `<text x="${padL - 6}" y="${+y + 3}" text-anchor="end" font-size="10" fill="var(--mut)">${fmtAxis(v, unit)}</text>`;
+  });
+  // подписи X (~6 дат)
+  const step = Math.max(1, Math.floor(n / 6));
+  data.forEach((d, i) => {
+    if (i % step === 0 || i === n - 1) {
+      const x = (padL + (n > 1 ? i * iw / (n - 1) : iw / 2)).toFixed(0);
+      g += `<text x="${x}" y="${H - 7}" text-anchor="middle" font-size="10" fill="var(--mut)">${fmtDay(d.date)}</text>`;
+    }
+  });
+  return g;
+}
+// линия с осями, сеткой, заливкой, точками и наведением
 function lineChart(data, key, color, unit) {
-  const W = 680, H = 150, pad = 26, n = data.length; if (!n) return '';
-  const max = Math.max(1, ...data.map((d) => d[key]));
-  const xs = (i) => pad + i * (W - pad * 2) / (n - 1 || 1), ys = (v) => H - pad - (v / max) * (H - pad * 2);
+  const W = 700, H = 190, padL = 46, padR = 12, padT = 12, padB = 26, n = data.length; if (!n) return '';
+  const max = Math.max(1, ...data.map((d) => d[key])), iw = W - padL - padR, ih = H - padT - padB;
+  const xs = (i) => padL + (n > 1 ? i * iw / (n - 1) : iw / 2), ys = (v) => padT + ih - (v / max) * ih;
   const pts = data.map((d, i) => `${xs(i).toFixed(0)},${ys(d[key]).toFixed(0)}`);
-  const area = `M${pad},${H - pad} L` + pts.join(' L') + ` L${(W - pad).toFixed(0)},${H - pad} Z`;
-  const colw = (W - pad * 2) / (n || 1), gid = 'g_' + key;
+  const area = `M${padL},${(padT + ih).toFixed(0)} L` + pts.join(' L') + ` L${(W - padR).toFixed(0)},${(padT + ih).toFixed(0)} Z`;
+  const colw = iw / (n || 1), gid = 'g_' + key;
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">`
-    + `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".35"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>`
+    + `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".3"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>`
+    + chartAxes(max, n, data, unit, W, H, padL, padR, padT, padB)
     + `<path d="${area}" fill="url(#${gid})"/>`
     + `<polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="2"/>`
     + data.map((d, i) => `<circle cx="${xs(i).toFixed(0)}" cy="${ys(d[key]).toFixed(0)}" r="2.5" fill="${color}"/>`).join('')
-    + data.map((d, i) => `<rect x="${(xs(i) - colw / 2).toFixed(0)}" y="0" width="${colw.toFixed(0)}" height="${H}" fill="transparent" style="cursor:pointer"><title>${esc(chartTip(d, key, unit))}</title></rect>`).join('')
+    + data.map((d, i) => `<rect x="${(xs(i) - colw / 2).toFixed(0)}" y="${padT}" width="${colw.toFixed(0)}" height="${ih}" fill="transparent" style="cursor:pointer"><title>${esc(chartTip(d, key, unit))}</title></rect>`).join('')
     + '</svg>';
 }
-// столбики + колонки-наведения
+// столбики с осями, сеткой и наведением
 function barChart(data, key, color, unit) {
-  const W = 680, H = 150, pad = 26, n = data.length; if (!n) return '';
-  const max = Math.max(1, ...data.map((d) => d[key])), bw = (W - pad * 2) / n;
+  const W = 700, H = 190, padL = 46, padR = 12, padT = 12, padB = 26, n = data.length; if (!n) return '';
+  const max = Math.max(1, ...data.map((d) => d[key])), iw = W - padL - padR, ih = H - padT - padB, bw = iw / n;
+  const ys = (v) => padT + ih - (v / max) * ih;
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">`
-    + data.map((d, i) => { const bh = (d[key] / max) * (H - pad * 2), x = pad + i * bw; return `<rect x="${(x + 2).toFixed(0)}" y="${(H - pad - bh).toFixed(0)}" width="${Math.max(1, bw - 4).toFixed(0)}" height="${bh.toFixed(0)}" rx="2" fill="${color}"/>`; }).join('')
-    + data.map((d, i) => `<rect x="${(pad + i * bw).toFixed(0)}" y="0" width="${bw.toFixed(0)}" height="${H}" fill="transparent" style="cursor:pointer"><title>${esc(chartTip(d, key, unit))}</title></rect>`).join('')
+    + chartAxes(max, n, data, unit, W, H, padL, padR, padT, padB)
+    + data.map((d, i) => { const bh = (d[key] / max) * ih, x = padL + i * bw; return `<rect x="${(x + 1.5).toFixed(0)}" y="${(ys(d[key])).toFixed(0)}" width="${Math.max(1, bw - 3).toFixed(0)}" height="${bh.toFixed(0)}" rx="2" fill="${color}"/>`; }).join('')
+    + data.map((d, i) => `<rect x="${(padL + i * bw).toFixed(0)}" y="${padT}" width="${bw.toFixed(0)}" height="${ih}" fill="transparent" style="cursor:pointer"><title>${esc(chartTip(d, key, unit))}</title></rect>`).join('')
     + '</svg>';
 }
 function funnelRow(label, value, pct, color) {

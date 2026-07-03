@@ -13,8 +13,10 @@ const TABS = [
   ['nodes', '03-admin-nodes'],
   ['users', '04-admin-users'],
   ['plans', '05-admin-plans'],
-  ['payments', '06-admin-payments'],
+  ['txns', '06-admin-payments'],
   ['tenants', '07-admin-franchises'],
+  ['finance', '08-admin-finance'],
+  ['traffic', '09-admin-traffic'],
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

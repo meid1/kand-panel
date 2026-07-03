@@ -3,16 +3,36 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
+import { DevicesService } from '../devices/devices.service';
 import { CreateUserDto, GrantDaysDto } from './dto/create-user.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private users: UsersService) {}
+  constructor(private users: UsersService, private devices: DevicesService) {}
 
   @Post()
   create(@Body() dto: CreateUserDto) {
     return this.users.create(dto);
+  }
+
+  // Ручное создание ключа: клиент без Telegram + сразу устройство и ссылки подписки.
+  // Отдаём готовые ссылки, чтобы админ мог передать их «на руки».
+  @Post('manual')
+  async manual(@Body() body: { name?: string; days?: number; tenantId?: string }) {
+    const user = await this.users.createManual(body?.name, Number(body?.days) || 0, body?.tenantId);
+    const device = await this.devices.create(user.id, body?.name || 'Ручной ключ');
+    const base = (process.env.PANEL_URL || '').replace(/\/+$/, '');
+    return {
+      user,
+      device,
+      links: {
+        sub: `${base}/sub/${device.subToken}`,
+        xray: `${base}/sub/${device.subToken}/xray`,
+        tv: `${base}/t/${device.tvCode}`,
+        cabinet: `${base}/cabinet/${device.subToken}`,
+      },
+    };
   }
 
   @Get()

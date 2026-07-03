@@ -108,6 +108,21 @@ export class UsersService {
     return this.prisma.user.update({ where: { id }, data: { isBlocked: blocked } });
   }
 
+  /** Ручное создание ключа (выдать кому-то без Telegram). tgId — уникальный отрицательный. */
+  async createManual(name?: string, days?: number, tenantId?: string) {
+    const tid = tenantId ?? (await this.platformTenantId());
+    let tgId = 0n;
+    for (let i = 0; i < 6; i++) {
+      tgId = -BigInt(Math.floor(Math.random() * 1e15) + 1); // отриц. → не пересекается с реальными tg id
+      if (!(await this.prisma.user.findFirst({ where: { tenantId: tid, tgId } }))) break;
+    }
+    let expireAt: Date | null = null;
+    if (days && days > 0) { expireAt = new Date(); expireAt.setDate(expireAt.getDate() + days); }
+    return this.prisma.user.create({
+      data: { tenantId: tid, tgId, tgName: name || 'Ручной ключ', isTrial: false, expireAt },
+    });
+  }
+
   /** Корректировка баланса (amount может быть отрицательным — списание). */
   async adjustBalance(id: string, amount: number) {
     await this.findOne(id);

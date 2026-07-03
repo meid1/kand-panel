@@ -141,7 +141,9 @@ async function delNode(id) { if (!confirm('Удалить ноду?')) return; t
 // ── КЛИЕНТЫ ──────────────────────────────────────────────────────────────────
 RENDER.users = async function () {
   const el = document.getElementById('tab-users');
-  el.innerHTML = '<div class="card"><b>Клиенты</b><div id="u_list" class="mut">загрузка…</div></div><div id="u_card"></div>';
+  el.innerHTML = '<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><b>Клиенты</b>'
+    + '<button class="btn sm" onclick="createManualKey()">🔑 Создать ключ</button></div>'
+    + '<div id="u_list" class="mut">загрузка…</div></div><div id="u_card"></div>';
   try {
     const users = await api('/users');
     document.getElementById('u_list').innerHTML = users.length ? '<table><tr><th>Клиент</th><th>Тариф до</th><th>Устройств</th><th></th></tr>'
@@ -151,6 +153,27 @@ RENDER.users = async function () {
       : '<span class="mut">нет клиентов</span>';
   } catch (e) { document.getElementById('u_list').textContent = e.message; }
 };
+// Ручное создание ключа (выдать кому-то без Telegram). Показываем готовые ссылки.
+async function createManualKey() {
+  const name = prompt('Название ключа (кому выдаём):', 'Ручной ключ');
+  if (name === null) return;
+  const d = prompt('На сколько дней? (0 = бессрочно, потом продлите вручную)', '30');
+  if (d === null) return;
+  try {
+    const r = await api('/users/manual', { method: 'POST', body: JSON.stringify({ name: name || 'Ручной ключ', days: Number(d) || 0 }) });
+    const L = r.links || {};
+    const box = document.getElementById('u_card');
+    box.innerHTML = '<div class="card"><b>🔑 Ключ создан</b>'
+      + `<div class="mut" style="margin:6px 0">${esc(name || 'Ручной ключ')}${Number(d) > 0 ? ' · ' + Number(d) + ' дн.' : ' · бессрочно'}</div>`
+      + '<div style="margin:8px 0"><div class="mut">Ссылка подписки (в приложение):</div><code style="word-break:break-all">' + esc(L.sub || '') + '</code></div>'
+      + '<div style="margin:8px 0"><div class="mut">Веб-кабинет (для клиента):</div><code style="word-break:break-all">' + esc(L.cabinet || '') + '</code></div>'
+      + '<div style="margin:8px 0"><div class="mut">Код для ТВ:</div><code>' + esc(L.tv || '') + '</code></div>'
+      + '<button class="btn sm" style="margin-top:8px" onclick="navigator.clipboard.writeText(' + JSON.stringify(L.sub || '') + ');toast(\'скопировано\')">📋 Скопировать ссылку</button>'
+      + '</div>';
+    RENDER.users();
+    toast('ключ создан');
+  } catch (e) { toast(e.message); }
+}
 async function openUser(id) {
   try {
     const u = await api('/users/' + id);

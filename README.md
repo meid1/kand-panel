@@ -47,6 +47,7 @@ docker compose -f infra/docker-compose.prod.yml up -d --build
 - `docs/install.md` — установка «с нуля» для новичка (пошагово).
 - `docs/routing.md` — умная маршрутизация, YouTube, обход, защита нод.
 - `docs/migration.md` — перенос клиентов/платежей/трафика/нод + сброс счётчика.
+- `docs/security-audit.md` — аудит безопасности + правило по nginx (CVE-2025-1974 и др.).
 
 ## Структура проекта (что где)
 ```

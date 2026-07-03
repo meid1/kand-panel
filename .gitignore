@@ -9,3 +9,8 @@ agent/vpanel-agent
 apps/api/public/*.map
 .autobuild_*
 *.bak_*
+# локальные тест/автосборочные артефакты (могут содержать токены)
+.run_test.sh
+.autobuild_env
+.autobuild_prompt.txt
+.autobuild_*

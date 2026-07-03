@@ -6,6 +6,7 @@ import { DevicesService } from '../devices/devices.service';
 import { PaymentsService } from '../payments/payments.service';
 import { BypassService } from '../bypass/bypass.service';
 import { ReferralService } from '../referral/referral.service';
+import { PlansService } from '../plans/plans.service';
 import { tg, InlineButton } from './telegram';
 
 /**
@@ -29,6 +30,7 @@ export class BotService implements OnModuleInit {
     private payments: PaymentsService,
     private bypass: BypassService,
     private referral: ReferralService,
+    private plans: PlansService,
   ) {}
 
   async onModuleInit() {
@@ -122,7 +124,9 @@ export class BotService implements OnModuleInit {
     if (data === 'support') {
       return tg.sendMessage(this.token, chatId, await this.subst(await this.settings.getText('text.help')));
     }
-    if (data === 'buy') return this.sendBuyMenu(chatId);
+    if (data === 'buy') return this.sendBuyMenu(chatId, user);
+    if (data.startsWith('plan:')) return this.sendPayMethods(chatId, data.slice(5));
+    if (data.startsWith('pay:')) { const [, planId, provider] = data.split(':'); return this.createInvoice(chatId, user, provider, planId); }
     if (data.startsWith('buy:')) return this.createInvoice(chatId, user, data.slice(4));
     if (data === 'referral') return this.sendReferral(chatId, user);
   }
@@ -172,21 +176,44 @@ export class BotService implements OnModuleInit {
     await tg.sendMessage(this.token, chatId, await this.subst(await this.settings.getText('text.trial'), { days: String(days) }), await this.menu());
   }
 
-  private async sendBuyMenu(chatId: number) {
+  private async sendBuyMenu(chatId: number, user: any) {
+    const plans = await this.plans.list(user.tenantId);
+    if (plans.length) {
+      // есть тарифы → сначала выбор тарифа
+      const buttons = plans.map((p) => [{ text: `${p.title} — ${p.price}₽`, callback_data: `plan:${p.id}` }]);
+      return tg.sendMessage(this.token, chatId, 'Выберите тариф:', buttons);
+    }
+    // фолбэк: единый тариф из настроек → сразу выбор способа оплаты
     const methods = await this.payments.available();
     if (!methods.length) return tg.sendMessage(this.token, chatId, 'Оплата временно недоступна.');
     const buttons = methods.map((m) => [{ text: m.title, callback_data: `buy:${m.id}` }]);
     await tg.sendMessage(this.token, chatId, 'Выберите способ оплаты:', buttons);
   }
 
-  private async createInvoice(chatId: number, user: any, provider: string) {
-    const daysS = await this.prisma.setting.findUnique({ where: { key: 'plan.days' } });
-    const priceS = await this.prisma.setting.findUnique({ where: { key: 'plan.price' } });
-    const days = daysS ? Number(daysS.value) || 30 : 30;
-    const amount = priceS ? Number(priceS.value) || 90 : 90;
+  private async sendPayMethods(chatId: number, planId: string) {
+    const methods = await this.payments.available();
+    if (!methods.length) return tg.sendMessage(this.token, chatId, 'Оплата временно недоступна.');
+    const buttons = methods.map((m) => [{ text: m.title, callback_data: `pay:${planId}:${m.id}` }]);
+    await tg.sendMessage(this.token, chatId, 'Способ оплаты:', buttons);
+  }
+
+  // provider ИЛИ {provider, planId} (для тарифа)
+  private async createInvoice(chatId: number, user: any, provider: string, planId?: string) {
     try {
-      const inv = await this.payments.createInvoice({ userId: user.id, provider, amount, days } as any);
-      await tg.sendMessage(this.token, chatId, `Оплата ${amount}₽ за ${days} дней:`, [[{ text: '💳 Оплатить', url: inv.url }]]);
+      let inv: any, label: string;
+      if (planId) {
+        inv = await this.payments.createInvoice({ userId: user.id, provider, planId } as any);
+        const plan = await this.plans.get(planId);
+        label = `Оплата ${plan?.price}₽ — ${plan?.title}:`;
+      } else {
+        const daysS = await this.prisma.setting.findUnique({ where: { key: 'plan.days' } });
+        const priceS = await this.prisma.setting.findUnique({ where: { key: 'plan.price' } });
+        const days = daysS ? Number(daysS.value) || 30 : 30;
+        const amount = priceS ? Number(priceS.value) || 90 : 90;
+        inv = await this.payments.createInvoice({ userId: user.id, provider, amount, days } as any);
+        label = `Оплата ${amount}₽ за ${days} дней:`;
+      }
+      await tg.sendMessage(this.token, chatId, label, [[{ text: '💳 Оплатить', url: inv.url }]]);
     } catch (e: any) {
       await tg.sendMessage(this.token, chatId, `Не удалось создать счёт: ${e.message || e}`);
     }

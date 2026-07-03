@@ -192,6 +192,31 @@ async function resetText(key) {
   try { await api('/settings/texts/' + encodeURIComponent(key) + '/reset', { method: 'POST' }); toast('сброшено'); RENDER.texts(); } catch (e) { toast(e.message); }
 }
 
+// ── ТАРИФЫ ───────────────────────────────────────────────────────────────────
+RENDER.plans = async function () {
+  const el = document.getElementById('tab-plans');
+  el.innerHTML = '<div class="card"><b>Новый тариф</b>'
+    + '<div class="row"><input id="pl_title" placeholder="Название (1 месяц)" class="grow"><input id="pl_days" type="number" placeholder="дней" style="max-width:90px"><input id="pl_price" type="number" placeholder="цена ₽" style="max-width:100px"><input id="pl_dev" type="number" placeholder="устройств (0=∞)" style="max-width:130px"></div>'
+    + '<div style="margin-top:8px"><button class="btn" onclick="addPlan()">Создать тариф</button></div></div>'
+    + '<div class="card"><b>Тарифы</b><div id="pl_list" class="mut">загрузка…</div></div>';
+  try {
+    const list = await api('/plans/all');
+    document.getElementById('pl_list').innerHTML = list.length ? '<table><tr><th>Тариф</th><th>Дней</th><th>Цена</th><th>Устройств</th><th></th></tr>'
+      + list.map(p => `<tr><td>${esc(p.title)} ${p.isActive ? '' : '<span class="pill">выкл</span>'}</td><td class="mut">${p.days}</td>`
+        + `<td class="mut">${p.price} ₽</td><td class="mut">${p.deviceLimit || '∞'}</td>`
+        + `<td class="row"><button class="btn sec sm" onclick="togglePlan('${p.id}',${!p.isActive})">${p.isActive ? 'выкл' : 'вкл'}</button>`
+        + `<button class="btn bad sm" onclick="delPlan('${p.id}')">×</button></td></tr>`).join('') + '</table>'
+      : '<span class="mut">тарифов нет</span>';
+  } catch (e) { document.getElementById('pl_list').textContent = e.message; }
+};
+async function addPlan() {
+  const body = { title: document.getElementById('pl_title').value.trim(), days: +document.getElementById('pl_days').value, price: +document.getElementById('pl_price').value, deviceLimit: +document.getElementById('pl_dev').value || 0 };
+  if (!body.title || !body.days || !body.price) return toast('заполни название, дни, цену');
+  try { await api('/plans', { method: 'POST', body: JSON.stringify(body) }); toast('тариф создан'); RENDER.plans(); } catch (e) { toast(e.message); }
+}
+async function togglePlan(id, active) { try { await api('/plans/' + id, { method: 'PATCH', body: JSON.stringify({ isActive: active }) }); RENDER.plans(); } catch (e) { toast(e.message); } }
+async function delPlan(id) { if (!confirm('Удалить тариф?')) return; try { await api('/plans/' + id, { method: 'DELETE' }); RENDER.plans(); } catch (e) { toast(e.message); } }
+
 // ── ПЛАТЁЖКИ ─────────────────────────────────────────────────────────────────
 RENDER.payments = async function () {
   const el = document.getElementById('tab-payments');

@@ -4,6 +4,7 @@ import { UsersService } from '../users/users.service';
 import { ProviderRegistry } from './providers/provider.registry';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { ReferralService } from '../referral/referral.service';
+import { PlansService } from '../plans/plans.service';
 
 /**
  * Оркестрация оплаты поверх реестра провайдеров. Единый путь:
@@ -19,6 +20,7 @@ export class PaymentsService {
     private registry: ProviderRegistry,
     private users: UsersService,
     private referral: ReferralService,
+    private plans: PlansService,
   ) {}
 
   async createInvoice(dto: CreateInvoiceDto) {
@@ -31,15 +33,24 @@ export class PaymentsService {
     const user = await this.prisma.user.findUnique({ where: { id: dto.userId } });
     if (!user) throw new NotFoundException('пользователь не найден');
 
+    // тариф (planId) перебивает amount/days; иначе берём напрямую из dto
+    let amount = dto.amount, days = dto.days, description = dto.description;
+    if (dto.planId) {
+      const plan = await this.plans.get(dto.planId);
+      if (!plan) throw new BadRequestException('тариф не найден');
+      amount = Number(plan.price); days = plan.days; description = description || plan.title;
+    }
+    if (amount == null || days == null) throw new BadRequestException('нужен planId или amount+days');
+
     const payment = await this.prisma.payment.create({
       data: {
         tenantId: user.tenantId,
         userId: user.id,
-        amount: dto.amount,
+        amount,
         method: dto.provider,
-        days: dto.days,
+        days,
         status: 'pending',
-        description: dto.description,
+        description,
       },
     });
 
@@ -47,9 +58,9 @@ export class PaymentsService {
       const inv = await provider.createInvoice(
         {
           paymentId: payment.id,
-          amount: dto.amount,
+          amount: amount!,
           currency: dto.currency || 'RUB',
-          description: dto.description || `Подписка ${dto.days} дн.`,
+          description: description || `Подписка ${days} дн.`,
           returnUrl: dto.returnUrl,
         },
         cfg,

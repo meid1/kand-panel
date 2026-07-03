@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { BridgeService } from '../bridge/bridge.service';
 import { CreateUserDto } from './dto/create-user.dto';
 
 /**
@@ -10,7 +11,7 @@ import { CreateUserDto } from './dto/create-user.dto';
  */
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private bridge: BridgeService) {}
 
   /** id платформенного тенанта (создаётся один раз). */
   async platformTenantId(): Promise<string> {
@@ -126,8 +127,11 @@ export class UsersService {
   }
 
   async setBlocked(id: string, blocked: boolean) {
-    await this.findOne(id);
-    return this.prisma.user.update({ where: { id }, data: { isBlocked: blocked } });
+    const u = await this.findOne(id);
+    const res = await this.prisma.user.update({ where: { id }, data: { isBlocked: blocked } });
+    // проброс в живой бэкенд: блок = выключить ключ, разблок = включить
+    if (u.externalId) await this.bridge.setEnabled(u.externalId, !blocked);
+    return res;
   }
 
   /** Ручное создание ключа (выдать кому-то без Telegram). tgId — уникальный отрицательный. */

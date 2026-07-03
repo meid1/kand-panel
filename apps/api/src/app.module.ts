@@ -31,6 +31,7 @@ import { PromoModule } from './promo/promo.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { MultibotModule } from './multibot/multibot.module';
 import { FinanceModule } from './finance/finance.module';
+import { BridgeModule } from './bridge/bridge.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { FinanceModule } from './finance/finance.module';
     DashboardModule,
     MultibotModule,
     FinanceModule,
+    BridgeModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

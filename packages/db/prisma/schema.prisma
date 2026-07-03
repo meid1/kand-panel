@@ -216,3 +216,15 @@ model AuditLog {
   createdAt DateTime @default(now())
   @@index([createdAt])
 }
+
+/// Ручной учёт финансов: расходы (сервера, реклама) и внешние доходы — поверх
+/// автоматических платежей. Для раздела «Финансы» (доход − расход = прибыль).
+model LedgerEntry {
+  id        String   @id @default(cuid())
+  tenantId  String?  // null = платформа; иначе франшиза
+  kind      String   // "expense" | "income"
+  amount    Decimal
+  note      String?
+  createdAt DateTime @default(now())
+  @@index([tenantId, kind, createdAt])
+}

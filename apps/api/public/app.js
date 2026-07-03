@@ -114,6 +114,53 @@ RENDER.dashboard = async function () {
   } catch (e) { el.innerHTML = '<div class="mut">' + esc(e.message) + '</div>'; }
 };
 
+// ── ФИНАНСЫ ──────────────────────────────────────────────────────────────────
+RENDER.finance = async function () {
+  const el = document.getElementById('tab-finance');
+  el.innerHTML = '<div class="mut">загрузка…</div>';
+  try {
+    const money = (v) => Number(v).toLocaleString('ru-RU') + '₽';
+    const s = await api('/finance/summary');
+    const led = await api('/finance/ledger');
+    const maxM = Math.max(1, ...s.byMonth.map((m) => m.amount));
+    el.innerHTML =
+      '<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:12px">'
+      + statCard('Доход (платежи)', money(s.revenueTotal), 'реально полученные оплаты')
+      + statCard('Внешние доходы', money(s.extraIncome), 'ручной учёт')
+      + statCard('Расходы', money(s.expenses), 'сервера, реклама и т.п.')
+      + statCard('Прибыль', money(s.profit), 'доход + внешние − расходы')
+      + '</div>'
+      + '<div class="card"><b>Доход по способам оплаты</b>'
+      + (s.byMethod.length ? '<table><tr><th>Способ</th><th>Сумма</th><th>Платежей</th></tr>'
+        + s.byMethod.map((m) => `<tr><td>${esc(m.method)}</td><td>${money(m.amount)}</td><td class="mut">${m.count}</td></tr>`).join('') + '</table>'
+        : '<div class="mut">нет данных</div>') + '</div>'
+      + '<div class="card"><b>Доход по месяцам</b><table>'
+      + (s.byMonth.length ? s.byMonth.map((m) => `<tr><td class="mut" style="width:80px">${m.month}</td>`
+        + `<td><div style="background:var(--acc);height:14px;border-radius:4px;width:${Math.max(2, m.amount / maxM * 100)}%;display:inline-block;vertical-align:middle"></div> ${money(m.amount)}</td></tr>`).join('')
+        : '<tr><td class="mut">нет данных</td></tr>') + '</table></div>'
+      + '<div class="card"><b>Учёт расходов и доходов</b>'
+      + '<div class="row" style="margin:8px 0"><select id="l_kind" style="max-width:130px"><option value="expense">Расход</option><option value="income">Доход</option></select>'
+      + '<input id="l_amount" type="number" placeholder="сумма ₽" style="max-width:120px"><input id="l_note" placeholder="комментарий" class="grow"><button class="btn sm" onclick="addLedger()">Добавить</button></div>'
+      + (led.length ? '<table><tr><th>Дата</th><th>Тип</th><th>Сумма</th><th>Комментарий</th><th></th></tr>'
+        + led.map((l) => `<tr><td class="mut">${new Date(l.createdAt).toLocaleDateString()}</td>`
+          + `<td>${l.kind === 'expense' ? '<span class="pill bad">расход</span>' : '<span class="pill ok">доход</span>'}</td>`
+          + `<td>${money(l.amount)}</td><td class="mut">${esc(l.note || '')}</td>`
+          + `<td><button class="btn bad sm" onclick="delLedger('${l.id}')">×</button></td></tr>`).join('') + '</table>'
+        : '<div class="mut">записей нет</div>') + '</div>';
+  } catch (e) { el.innerHTML = '<div class="mut">' + esc(e.message) + '</div>'; }
+};
+async function addLedger() {
+  const kind = document.getElementById('l_kind').value;
+  const amount = parseFloat(document.getElementById('l_amount').value);
+  const note = document.getElementById('l_note').value.trim();
+  if (!amount || amount <= 0) return toast('введи сумму');
+  try { await api('/finance/ledger', { method: 'POST', body: JSON.stringify({ kind, amount, note }) }); toast('добавлено'); RENDER.finance(); } catch (e) { toast(e.message); }
+}
+async function delLedger(id) {
+  if (!confirm('Удалить запись?')) return;
+  try { await api('/finance/ledger/' + id, { method: 'DELETE' }); toast('удалено'); RENDER.finance(); } catch (e) { toast(e.message); }
+}
+
 // ── НОДЫ ─────────────────────────────────────────────────────────────────────
 const PROTOS = ['reality-tcp', 'reality-grpc', 'hysteria2', 'xhttp'];
 RENDER.nodes = async function () {

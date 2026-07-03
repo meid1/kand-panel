@@ -45,6 +45,15 @@ export class BridgeService {
     try { const r = await this.call('GET', '/v1/nodes'); return r?.data || null; }
     catch { return null; }
   }
+  /** Переименовать / скрыть-показать сервер внешнего бэкенда (по индексу). */
+  patchNode(idx: number, fields: { remark?: string; hidden?: boolean }) {
+    return this.safe(() => this.call('PATCH', `/v1/nodes/${idx}`, fields), `patchNode ${idx}`);
+  }
+  /** Порядок серверов внешнего бэкенда (order = перестановка индексов). */
+  reorderNodes(order: number[]) {
+    return this.safe(() => this.call('POST', '/v1/nodes/reorder', { order }), 'reorderNodes');
+  }
+
   /** Топ клиентов по трафику (up+down) из внешнего бэкенда. */
   async trafficTop(limit = 50): Promise<any[]> {
     if (!this.enabled) return [];

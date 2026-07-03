@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BridgeService } from './bridge.service';
 
@@ -23,5 +23,15 @@ export class BridgeController {
   @Get('traffic-top')
   async trafficTop() {
     return { enabled: this.bridge.enabled, top: await this.bridge.trafficTop(50) };
+  }
+
+  // управление живыми серверами внешнего бэкенда
+  @Patch('nodes/:idx')
+  patchNode(@Param('idx') idx: string, @Body() body: { remark?: string; hidden?: boolean }) {
+    return this.bridge.patchNode(Number(idx), body);
+  }
+  @Post('nodes/reorder')
+  reorderNodes(@Body('order') order: number[]) {
+    return this.bridge.reorderNodes(order);
   }
 }

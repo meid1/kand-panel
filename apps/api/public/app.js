@@ -459,11 +459,30 @@ async function loadCdnNodes() {
   try {
     const r = await api('/bridge/nodes');
     if (!r.enabled || !r.nodes || !r.nodes.length) { box.innerHTML = ''; return; }
-    box.innerHTML = '<div class="mut" style="font-size:12px;margin-bottom:6px">🟢 Живые серверы (внешний бэкенд, только просмотр):</div>'
-      + '<table><tr><th>Сервер</th><th>Хост</th><th>Протоколы</th></tr>'
-      + r.nodes.map((n) => `<tr><td>${esc(n.remark || n.host || '—')}</td><td class="mut">${esc(n.host || '')}${n.port ? ':' + n.port : ''}</td><td class="mut">${esc((n.protos || []).join(', '))}</td></tr>`).join('')
+    window._cdnNodes = r.nodes;
+    box.innerHTML = '<div class="mut" style="font-size:12px;margin-bottom:6px">🟢 Живые серверы (внешний бэкенд). Порядок ↑↓ = очередь в подписке, имя = название у клиента.</div>'
+      + '<table><tr><th>#</th><th>Сервер</th><th>Хост</th><th>Протоколы</th><th></th></tr>'
+      + r.nodes.map((n, i) => `<tr><td style="white-space:nowrap"><button class="btn sec sm" ${i === 0 ? 'disabled' : ''} onclick="cdnMove(${i},-1)">↑</button> <button class="btn sec sm" ${i === r.nodes.length - 1 ? 'disabled' : ''} onclick="cdnMove(${i},1)">↓</button></td>`
+        + `<td>${esc(n.remark || '—')} ${n.hidden ? '<span class="pill bad">скрыт</span>' : '<span class="pill ok">показан</span>'}</td>`
+        + `<td class="mut">${esc(n.host || '')}${n.port ? ':' + n.port : ''}</td><td class="mut">${esc((n.protos || []).join(', '))}</td>`
+        + `<td class="row"><button class="btn sec sm" onclick='cdnRename(${i},${JSON.stringify(n.remark || '')})'>✏️ имя</button>`
+        + `<button class="btn sec sm" onclick="cdnToggle(${i},${!n.hidden})">${n.hidden ? '👁 показать' : '🙈 скрыть'}</button></td></tr>`).join('')
       + '</table><div style="height:14px"></div>';
   } catch (e) { box.innerHTML = ''; }
+}
+async function cdnRename(idx, current) {
+  const name = prompt('Название сервера (видит клиент в подписке):', current);
+  if (name === null || !name.trim()) return;
+  try { await api('/bridge/nodes/' + idx, { method: 'PATCH', body: JSON.stringify({ remark: name.trim() }) }); toast('переименовано'); loadCdnNodes(); } catch (e) { toast(e.message); }
+}
+async function cdnToggle(idx, hidden) {
+  try { await api('/bridge/nodes/' + idx, { method: 'PATCH', body: JSON.stringify({ hidden }) }); toast(hidden ? 'скрыт из подписки' : 'показан в подписке'); loadCdnNodes(); } catch (e) { toast(e.message); }
+}
+async function cdnMove(i, dir) {
+  const n = (window._cdnNodes || []).length; const j = i + dir; if (j < 0 || j >= n) return;
+  const order = [...Array(n).keys()];
+  [order[i], order[j]] = [order[j], order[i]];
+  try { await api('/bridge/nodes/reorder', { method: 'POST', body: JSON.stringify({ order }) }); toast('порядок изменён'); loadCdnNodes(); } catch (e) { toast(e.message); }
 }
 async function toggleNode(id, active) { try { await api('/nodes/' + id, { method: 'PATCH', body: JSON.stringify({ isActive: active }) }); RENDER.nodes(); } catch (e) { toast(e.message); } }
 async function setWarp(id, enable) { toast(enable ? 'включаю WARP…' : 'выключаю WARP…'); try { const r = await api('/nodes/' + id + '/warp', { method: 'POST', body: JSON.stringify({ enable }) }); toast(r.pushed ? 'WARP применён на сервере' : 'сохранено (сервер офлайн — применится позже)'); RENDER.nodes(); } catch (e) { toast(e.message); } }

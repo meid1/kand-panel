@@ -1,5 +1,5 @@
 // Kand admin — vanilla JS, без сборки. Работает на статике, ходит в /api с JWT.
-const APP_VERSION = 'v0.11.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
+const APP_VERSION = 'v0.12.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
 const API = '/api';
 let TOKEN = localStorage.getItem('vp_token') || '';
 // показать версию (шапка + вход)
@@ -164,6 +164,13 @@ RENDER.dashboard = async function () {
       + `<div class="card" style="flex:1;min-width:280px"><div class="row" style="justify-content:space-between"><b>Выручка по дням</b><span class="pill ok">${money(h.revenueMonth)}</span></div><div class="mut" style="font-size:12px;margin:2px 0 6px">30 дней · наведи на график</div>${lineChart(s.chart, 'revenue', '#22D3EE', 'money')}</div>`
       + `<div class="card" style="flex:1;min-width:280px"><div class="row" style="justify-content:space-between"><b>Регистрации</b><span class="pill">${s.chart.reduce((a, c) => a + c.signups, 0)}</span></div><div class="mut" style="font-size:12px;margin:2px 0 6px">по дням · наведи на график</div>${barChart(s.chart, 'signups', '#34D399', 'count')}</div>`
       + '</div>'
+      + (s.forecast ? '<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><b>Прогноз дохода</b><span class="pill">следующий месяц</span></div>'
+        + `<div style="font-size:30px;font-weight:800;color:#fbbf24;margin:8px 0 2px">${money(s.forecast.next)}</div>`
+        + `<div class="mut" style="font-size:12px">коридор ${money(s.forecast.low)} — ${money(s.forecast.high)}</div>`
+        + '<div class="mut" style="font-size:11px;margin:10px 0 2px;text-transform:uppercase;letter-spacing:.04em">История по месяцам</div>'
+        + lineChart(s.forecast.byMonth.map((m) => ({ date: m.month, revenue: m.amount })), 'revenue', '#fbbf24', 'money')
+        + '<div class="mut" style="font-size:11px;margin-top:4px">Прогноз по факту последних 30 дней × тренд · точность ±25-30% (история короткая)</div></div>'
+        : '')
       + '<div class="card"><b>Последние платежи</b>'
       + (s.recent.length ? '<table><tr><th>Клиент</th><th>Сумма</th><th>Способ</th><th>Когда</th></tr>'
         + s.recent.map((p) => `<tr><td>${esc(p.name)}</td><td>${money(p.amount)}${p.topup ? ' <span class="pill">пополнение</span>' : ''}</td>`

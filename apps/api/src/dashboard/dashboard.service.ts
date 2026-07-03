@@ -78,6 +78,18 @@ export class DashboardService {
       chart.push({ date: key, revenue, signups });
     }
 
+    // прогноз дохода: история по месяцам (6 мес) + оценка следующего месяца
+    const paysM = await this.prisma.payment.findMany({
+      where: { ...T, status: 'paid', paidAt: { gte: new Date(now.getTime() - 190 * 86400_000) } },
+      select: { amount: true, paidAt: true },
+    });
+    const monthMap = new Map<string, number>();
+    for (const p of paysM) { if (!p.paidAt) continue; const k = p.paidAt.toISOString().slice(0, 7); monthMap.set(k, (monthMap.get(k) || 0) + Number(p.amount)); }
+    const byMonth = [...monthMap.entries()].sort().map(([month, amount]) => ({ month, amount }));
+    const trend = revPrevMonth ? Math.max(0.7, Math.min(1.4, revMonth / revPrevMonth)) : 1;
+    const fNext = Math.round(revMonth * trend);
+    const forecast = { next: fNext, low: Math.round(fNext * 0.82), high: Math.round(fNext * 1.18), byMonth };
+
     // последние платежи
     const recent = await this.prisma.payment.findMany({
       where: { ...T, status: 'paid' }, orderBy: { paidAt: 'desc' }, take: 8,
@@ -92,6 +104,7 @@ export class DashboardService {
       health: { revenueMonth: revMonth, revenuePrevMonth: revPrevMonth, momPct, active,
         activePayers, churnedPayers, churnPct, arppu, ltv, payingUsers, payingUsersMonth },
       funnel: { entered: total, access: withDevice, paid: payingUsers },
+      forecast,
       chart,
       recent: recent.map((p) => ({
         amount: Number(p.amount), method: p.method, topup: p.topup,

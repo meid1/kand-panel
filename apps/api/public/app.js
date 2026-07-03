@@ -111,7 +111,7 @@ RENDER.users = async function () {
   try {
     const users = await api('/users');
     document.getElementById('u_list').innerHTML = users.length ? '<table><tr><th>Клиент</th><th>Тариф до</th><th>Устройств</th><th></th></tr>'
-      + users.map((u) => `<tr><td>${esc(u.tgName || u.tgUsername || u.tgId)} <span class="mut">${u.tenant ? esc(u.tenant.brand) : ''}</span></td>`
+      + users.map((u) => `<tr><td>${esc(u.tgName || u.tgUsername || u.tgId)} ${u.tenant && u.tenant.kind === 'franchise' ? '<span class="pill">' + esc(u.tenant.brand) + '</span>' : ''}</td>`
         + `<td class="mut">${u.expireAt ? new Date(u.expireAt).toLocaleDateString() : '—'}</td><td class="mut">${(u.devices || []).length}</td>`
         + `<td><button class="btn sec sm" onclick="openUser('${u.id}')">открыть</button></td></tr>`).join('') + '</table>'
       : '<span class="mut">нет клиентов</span>';

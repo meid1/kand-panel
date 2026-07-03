@@ -6,6 +6,17 @@
 
 > 💬 **Поможем с установкой и переносом клиентов** — пиши в Telegram **[@marius_support](https://t.me/marius_support)**.
 
+## Скриншоты
+| Ноды (добавление одной командой) | Клиент — веб-кабинет |
+|---|---|
+| ![Ноды](docs/screenshots/02-admin-nodes.png) | ![Кабинет](docs/screenshots/10-cabinet.png) |
+
+| Тарифы | Тексты и кнопки | Платёжки |
+|---|---|---|
+| ![Тарифы](docs/screenshots/04-admin-plans.png) | ![Тексты](docs/screenshots/05-admin-texts.png) | ![Платёжки](docs/screenshots/06-admin-payments.png) |
+
+<sub>Данные на скриншотах — демонстрационные.</sub>
+
 ## Чем отличается от Remnawave / Marzban / 3x-ui
 - 🇷🇺 **Умная маршрутизация**: РФ-сервисы (банки, госуслуги, маркетплейсы) — напрямую, остальное — через VPN.
 - ▶️ **YouTube без рекламы** — через ноду с ролью РФ-выхода.

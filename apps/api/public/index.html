@@ -46,6 +46,7 @@
 <body>
 <div id="login">
   <h1>Kand — вход</h1>
+  <div id="ver_login" class="mut" style="text-align:center;font-size:12px;margin:-6px 0 10px"></div>
   <input id="pw" type="password" placeholder="Пароль администратора" autocomplete="current-password">
   <button class="btn" style="width:100%" onclick="doLogin()">Войти</button>
   <div id="loginErr" class="mut" style="color:var(--bad);margin-top:8px"></div>
@@ -53,7 +54,7 @@
 
 <div id="app" class="hidden">
   <header>
-    <b>Kand</b>
+    <b>Kand</b><span id="ver" class="mut" style="font-size:11px"></span>
     <nav>
       <button data-tab="dashboard" class="on">Дашборд</button>
       <button data-tab="nodes">Ноды</button>

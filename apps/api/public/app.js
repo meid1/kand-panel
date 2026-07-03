@@ -1,6 +1,12 @@
-// VPanel admin — vanilla JS, без сборки. Работает на статике, ходит в /api с JWT.
+// Kand admin — vanilla JS, без сборки. Работает на статике, ходит в /api с JWT.
+const APP_VERSION = 'v0.9.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
 const API = '/api';
 let TOKEN = localStorage.getItem('vp_token') || '';
+// показать версию (шапка + вход)
+document.addEventListener('DOMContentLoaded', () => {
+  const a = document.getElementById('ver'); if (a) a.textContent = APP_VERSION;
+  const b = document.getElementById('ver_login'); if (b) b.textContent = APP_VERSION;
+});
 
 async function api(path, opts = {}) {
   const r = await fetch(API + path, {
@@ -68,28 +74,36 @@ document.querySelectorAll('nav button').forEach((b) => b.onclick = () => switchT
 // ── ДАШБОРД ──────────────────────────────────────────────────────────────────
 function statCard(label, value, sub) {
   return '<div class="card" style="flex:1;min-width:150px;margin:0">'
-    + `<div class="mut" style="font-size:13px">${label}</div>`
-    + `<div style="font-size:26px;font-weight:700;margin:4px 0">${value}</div>`
+    + `<div class="mut" style="font-size:11px;letter-spacing:.04em;text-transform:uppercase">${label}</div>`
+    + `<div style="font-size:26px;font-weight:800;margin:6px 0">${value}</div>`
     + (sub ? `<div class="mut" style="font-size:12px">${sub}</div>` : '') + '</div>';
 }
-// простой SVG-график: две метрики (доход столбиками, регистрации линией)
-function miniChart(chart) {
-  const W = 640, H = 140, pad = 24;
-  const n = chart.length; if (!n) return '';
-  const maxR = Math.max(1, ...chart.map((c) => c.revenue));
-  const maxS = Math.max(1, ...chart.map((c) => c.signups));
-  const bw = (W - pad * 2) / n;
-  let bars = '', pts = [];
-  chart.forEach((c, i) => {
-    const x = pad + i * bw;
-    const bh = (c.revenue / maxR) * (H - pad * 2);
-    bars += `<rect x="${x + 3}" y="${H - pad - bh}" width="${bw - 6}" height="${bh}" rx="3" fill="var(--acc)" opacity="0.85"><title>${c.date}: ${c.revenue}₽, ${c.signups} рег.</title></rect>`;
-    const sy = H - pad - (c.signups / maxS) * (H - pad * 2);
-    pts.push(`${(x + bw / 2).toFixed(0)},${sy.toFixed(0)}`);
-  });
-  const line = `<polyline points="${pts.join(' ')}" fill="none" stroke="#ffb020" stroke-width="2"/>`;
-  const dots = pts.map((p) => `<circle cx="${p.split(',')[0]}" cy="${p.split(',')[1]}" r="2.5" fill="#ffb020"/>`).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">${bars}${line}${dots}</svg>`;
+// линия с заливкой (выручка)
+function lineChart(data, key, color) {
+  const W = 680, H = 150, pad = 26, n = data.length; if (!n) return '';
+  const max = Math.max(1, ...data.map((d) => d[key]));
+  const xs = (i) => pad + i * (W - pad * 2) / (n - 1 || 1), ys = (v) => H - pad - (v / max) * (H - pad * 2);
+  const pts = data.map((d, i) => `${xs(i).toFixed(0)},${ys(d[key]).toFixed(0)}`);
+  const area = `M${pad},${H - pad} L` + pts.join(' L') + ` L${(W - pad).toFixed(0)},${H - pad} Z`;
+  const gid = 'g_' + key;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">`
+    + `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".35"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>`
+    + `<path d="${area}" fill="url(#${gid})"/>`
+    + `<polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="2"/>`
+    + data.map((d, i) => `<circle cx="${xs(i).toFixed(0)}" cy="${ys(d[key]).toFixed(0)}" r="6" fill="transparent"><title>${d.date}: ${d[key]}</title></circle>`).join('')
+    + '</svg>';
+}
+// столбики (регистрации)
+function barChart(data, key, color) {
+  const W = 680, H = 150, pad = 26, n = data.length; if (!n) return '';
+  const max = Math.max(1, ...data.map((d) => d[key])), bw = (W - pad * 2) / n;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">`
+    + data.map((d, i) => { const bh = (d[key] / max) * (H - pad * 2), x = pad + i * bw; return `<rect x="${(x + 2).toFixed(0)}" y="${(H - pad - bh).toFixed(0)}" width="${Math.max(1, bw - 4).toFixed(0)}" height="${bh.toFixed(0)}" rx="2" fill="${color}"><title>${d.date}: ${d[key]}</title></rect>`; }).join('')
+    + '</svg>';
+}
+function funnelRow(label, value, pct, color) {
+  return `<div style="margin:12px 0"><div class="row" style="justify-content:space-between"><span>${label}</span><span><b>${(value || 0).toLocaleString('ru-RU')}</b> <span class="mut">· ${pct}%</span></span></div>`
+    + `<div style="height:12px;background:#1b2740;border-radius:6px;overflow:hidden;margin-top:5px"><div style="height:100%;width:${Math.max(1, pct)}%;background:${color};border-radius:6px"></div></div></div>`;
 }
 RENDER.dashboard = async function () {
   const el = document.getElementById('tab-dashboard');
@@ -97,22 +111,29 @@ RENDER.dashboard = async function () {
   try {
     const s = await api('/dashboard/summary');
     const money = (v) => Number(v).toLocaleString('ru-RU') + '₽';
+    const h = s.health || {}, f = s.funnel || {};
+    const pct = (a, b) => (b ? Math.round(a / b * 100) : 0);
+    const mom = (h.momPct >= 0)
+      ? `<span class="pill ok">▲ +${h.momPct}% выручка к пред. мес.</span>`
+      : `<span class="pill bad">▼ ${h.momPct}% выручка к пред. мес.</span>`;
     el.innerHTML =
-      '<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:12px">'
-      + statCard('Клиентов активно', s.users.active, `всего ${s.users.total} · триал ${s.users.trial} · заблок. ${s.users.blocked}`)
-      + statCard('Новые', '+' + s.users.newDay, `за сутки · за неделю +${s.users.newWeek}`)
-      + statCard('Ноды онлайн', s.nodes.online + ' / ' + s.nodes.total, s.nodes.online < s.nodes.total ? '⚠️ есть офлайн' : 'все в строю')
-      + statCard('Устройств', s.devices, 'выданных ключей')
+      `<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><b style="font-size:17px">Здоровье бизнеса</b>${mom}</div>`
+      + '<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:14px">'
+      + statCard('Выручка / мес', money(h.revenueMonth), 'живые деньги за 30 дн.')
+      + statCard('Активных', h.active, 'действующих подписок')
+      + statCard('Отток / мес', (h.churnPct || 0) + '%', 'подписок закончилось')
+      + statCard('ARPU', money(h.arpu), 'в среднем с 1 клиента/мес')
+      + statCard('LTV', money(h.ltv), 'принёс 1 клиент всего')
       + '</div>'
-      + '<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:12px">'
-      + statCard('Доход за сутки', money(s.revenue.day), '')
-      + statCard('За неделю', money(s.revenue.week), '')
-      + statCard('За 30 дней', money(s.revenue.month), '')
-      + statCard('Всего получено', money(s.revenue.total), 'оплата с баланса не считается повторно')
+      + '<div class="card"><b>Воронка (главный бот)</b>'
+      + funnelRow('Зашли', f.entered, 100, 'var(--acc)')
+      + funnelRow('Получили доступ', f.access, pct(f.access, f.entered), '#6b8afd')
+      + funnelRow('Оплатили', f.paid, pct(f.paid, f.entered), 'var(--ok)')
       + '</div>'
-      + '<div class="card"><b>Доход и регистрации · 14 дней</b>'
-      + '<div class="mut" style="font-size:12px;margin:4px 0 8px">Столбцы — доход (₽), линия — новые клиенты</div>'
-      + miniChart(s.chart) + '</div>'
+      + '<div class="row" style="gap:12px;flex-wrap:wrap">'
+      + `<div class="card" style="flex:1;min-width:280px"><div class="row" style="justify-content:space-between"><b>Выручка по дням</b><span class="pill ok">${money(h.revenueMonth)}</span></div><div class="mut" style="font-size:12px;margin:2px 0 6px">30 дней</div>${lineChart(s.chart, 'revenue', '#22D3EE')}</div>`
+      + `<div class="card" style="flex:1;min-width:280px"><div class="row" style="justify-content:space-between"><b>Регистрации</b><span class="pill">${s.chart.reduce((a, c) => a + c.signups, 0)}</span></div><div class="mut" style="font-size:12px;margin:2px 0 6px">по дням</div>${barChart(s.chart, 'signups', '#34D399')}</div>`
+      + '</div>'
       + '<div class="card"><b>Последние платежи</b>'
       + (s.recent.length ? '<table><tr><th>Клиент</th><th>Сумма</th><th>Способ</th><th>Когда</th></tr>'
         + s.recent.map((p) => `<tr><td>${esc(p.name)}</td><td>${money(p.amount)}${p.topup ? ' <span class="pill">пополнение</span>' : ''}</td>`

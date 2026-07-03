@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { NodeAgentClient } from '../nodes-agent/node-agent.client';
+import { ReconcileService } from '../reconcile/reconcile.service';
 
 const AGENT_PORT = 8443;
 const DAY = 86400_000;
@@ -15,7 +16,11 @@ const DAY = 86400_000;
 @Injectable()
 export class MonitoringService {
   private readonly log = new Logger(MonitoringService.name);
-  constructor(private prisma: PrismaService, private agent: NodeAgentClient) {}
+  constructor(
+    private prisma: PrismaService,
+    private agent: NodeAgentClient,
+    private reconcile: ReconcileService,
+  ) {}
 
   private async setting(key: string): Promise<string> {
     return (await this.prisma.setting.findUnique({ where: { key } }))?.value || '';
@@ -48,6 +53,13 @@ export class MonitoringService {
             ? `✅ Нода «${n.label}» (${n.ip}) снова онлайн.`
             : `⚠️ Нода «${n.label}» (${n.ip}) НЕ отвечает (офлайн). Проверьте сервер.`);
         }
+        // авто-хил: нода вернулась → перераскатываем ключи (могла перезапуститься и потерять состояние)
+        if (healthy) {
+          this.reconcile.reconcileNode(n.id).catch((e) =>
+            this.log.warn(`авто-хил ${n.label}: ${e.message || e}`));
+        }
+      } else {
+        await this.prisma.node.update({ where: { id: n.id }, data: { lastCheck: new Date() } });
       }
     }
   }

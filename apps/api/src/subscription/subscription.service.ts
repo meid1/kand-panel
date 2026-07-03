@@ -65,7 +65,7 @@ export class SubscriptionService {
     if (!device) throw new NotFoundException('подписка не найдена');
     const user = device.user;
     const brand = user.tenant?.brand || 'VPN';
-    const nodes = await this.prisma.node.findMany({
+    let nodes = await this.prisma.node.findMany({
       where: {
         isActive: true, showInSub: true,
         OR: [{ tenantId: null }, { tenantId: user.tenantId }],
@@ -73,6 +73,20 @@ export class SubscriptionService {
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
       include: { inbounds: true },
     });
+    // Failover: не отдаём клиенту офлайн-ноды, если есть живые (монитор ставит online).
+    // Если живых нет вовсе (монитор ещё не прошёл) — отдаём все, чтобы не оставить без VPN.
+    const failover = (await this.prisma.setting.findUnique({ where: { key: 'sub.failover' } }))?.value;
+    if (failover !== '0') {
+      const onlineNodes = nodes.filter((n) => n.online);
+      if (onlineNodes.length) nodes = onlineNodes;
+    }
+    // Балансировка: разным клиентам — разный порядок нод (детерминированно по токену),
+    // чтобы приложения не грузили одну и ту же первую ноду. Внутри — стабильный сорт.
+    if (nodes.length > 1) {
+      const seed = Array.from(token).reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+      const shift = seed % nodes.length;
+      nodes = nodes.slice(shift).concat(nodes.slice(0, shift));
+    }
     const blocked = user.isBlocked ||
       (user.expireAt != null && user.expireAt.getTime() < Date.now());
     const bypassSuspended = await this.bypass.isSuspended(user.id);

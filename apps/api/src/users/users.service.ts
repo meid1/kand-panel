@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BridgeService } from '../bridge/bridge.service';
+import { VpnDbService } from '../bridge/vpndb.service';
 import { CreateUserDto } from './dto/create-user.dto';
 
 /**
@@ -11,7 +12,7 @@ import { CreateUserDto } from './dto/create-user.dto';
  */
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService, private bridge: BridgeService) {}
+  constructor(private prisma: PrismaService, private bridge: BridgeService, private vpndb: VpnDbService) {}
 
   /** id платформенного тенанта (создаётся один раз). */
   async platformTenantId(): Promise<string> {
@@ -121,16 +122,23 @@ export class UsersService {
       : await this.nowMs();
     const next = new Date(0);
     next.setTime(base + days * 86400_000);
-    return this.prisma.user.update({
+    const res = await this.prisma.user.update({
       where: { id }, data: { expireAt: next, isTrial: false, remindStage: 0 }, // продлили → напоминания заново
     });
+    // проброс в живой бот (vpn_db) + включить ключ при продлении
+    if (u.tgId && u.tgId > 0n) {
+      await this.vpndb.grantDays(u.tgId.toString(), days);
+      if (days > 0 && u.externalId) await this.bridge.setEnabled(u.externalId, true);
+    }
+    return res;
   }
 
   async setBlocked(id: string, blocked: boolean) {
     const u = await this.findOne(id);
     const res = await this.prisma.user.update({ where: { id }, data: { isBlocked: blocked } });
-    // проброс в живой бэкенд: блок = выключить ключ, разблок = включить
+    // проброс в живой бэкенд: блок = выключить ключ (+ is_banned в боте), разблок = включить
     if (u.externalId) await this.bridge.setEnabled(u.externalId, !blocked);
+    if (u.tgId && u.tgId > 0n) await this.vpndb.setBanned(u.tgId.toString(), blocked);
     return res;
   }
 

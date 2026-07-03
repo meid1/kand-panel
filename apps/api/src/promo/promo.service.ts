@@ -25,6 +25,17 @@ export class PromoService {
   async list() { return this.prisma.promoCode.findMany({ orderBy: { createdAt: 'desc' } }); }
   async remove(id: string) { await this.prisma.promoCode.delete({ where: { id } }); return { ok: true }; }
 
+  async update(id: string, dto: any) {
+    const data: any = {};
+    if (dto.type) {
+      if (!['days', 'bypass_gb', 'balance'].includes(dto.type)) throw new BadRequestException('type: days|bypass_gb|balance');
+      data.type = dto.type;
+    }
+    if (dto.value != null) data.value = Number(dto.value);
+    if (dto.maxUses != null) data.maxUses = Number(dto.maxUses);
+    return this.prisma.promoCode.update({ where: { id }, data });
+  }
+
   /** Погашение кода клиентом. Возвращает {ok, message}. */
   async redeem(userId: string, codeRaw: string) {
     const code = String(codeRaw || '').trim().toUpperCase();

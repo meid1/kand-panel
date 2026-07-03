@@ -32,6 +32,20 @@ export class BridgeService {
     catch (e: any) { this.log.warn(`мост ${ctx}: ${e.message || e}`); return { ok: false, error: String(e.message || e) }; }
   }
 
+  /** Живой статус внешнего бэкенда (онлайн-юзеры, устройства, трафик, ноды). null если выкл/недоступен. */
+  async status(): Promise<any> {
+    if (!this.enabled) return null;
+    try {
+      const r = await this.call('GET', '/v1/status');
+      return r?.data || null;
+    } catch (e: any) { this.log.warn(`мост status: ${e.message || e}`); return null; }
+  }
+  async onlineNodes(): Promise<any> {
+    if (!this.enabled) return null;
+    try { const r = await this.call('GET', '/v1/nodes'); return r?.data || null; }
+    catch { return null; }
+  }
+
   async setEnabled(email: string, on: boolean) {
     return this.safe(() => this.call('POST', `/v1/clients/${on ? 'on' : 'off'}-by-email/${encodeURIComponent(email)}`), `${on ? 'on' : 'off'} ${email}`);
   }

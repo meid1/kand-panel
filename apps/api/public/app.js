@@ -111,6 +111,19 @@ RENDER.dashboard = async function () {
         + s.recent.map((p) => `<tr><td>${esc(p.name)}</td><td>${money(p.amount)}${p.topup ? ' <span class="pill">пополнение</span>' : ''}</td>`
           + `<td class="mut">${esc(p.method)}</td><td class="mut">${p.paidAt ? new Date(p.paidAt).toLocaleString() : '—'}</td></tr>`).join('') + '</table>'
         : '<div class="mut">пока нет</div>') + '</div>';
+    // живой бэкенд (если подключён мост) — реальные онлайны/трафик
+    try {
+      const bs = await api('/bridge/status');
+      if (bs.enabled && bs.status) {
+        const x = bs.status; const tb = (b) => (Number(b || 0) / 1073741824).toFixed(1) + ' ГБ';
+        el.insertAdjacentHTML('afterbegin', '<div class="card"><b>🟢 Живой бэкенд</b>'
+          + '<div class="row" style="gap:18px;flex-wrap:wrap;margin-top:6px">'
+          + `<span>Онлайн: <b>${x.onlineUsers || 0}</b> юзеров · ${x.onlineDevices || 0} устройств</span>`
+          + `<span class="mut">Ключей: ${x.clients || 0} (активных ${x.enabled || 0})</span>`
+          + `<span class="mut">Трафик: ↑${tb(x.up)} ↓${tb(x.down)}</span>`
+          + `<span class="mut">xray: ${x.xrayRunning ? '🟢 работает' : '🔴 стоп'}</span></div></div>`);
+      }
+    } catch (e) { /* моста нет — норм */ }
   } catch (e) { el.innerHTML = '<div class="mut">' + esc(e.message) + '</div>'; }
 };
 
@@ -556,7 +569,7 @@ RENDER.promo = async function () {
   try {
     const list = await api('/promo');
     document.getElementById('pm_list').innerHTML = list.length ? '<table><tr><th>Код</th><th>Тип</th><th>Значение</th><th>Использовано</th><th></th></tr>'
-      + list.map(p => `<tr><td><code>${esc(p.code)}</code></td><td class="mut">${p.type}</td><td class="mut">${p.value}</td><td class="mut">${p.usedCount}/${p.maxUses}</td><td><button class="btn bad sm" onclick="delPromo('${p.id}')">×</button></td></tr>`).join('') + '</table>'
+      + list.map(p => `<tr><td><code>${esc(p.code)}</code></td><td class="mut">${p.type}</td><td class="mut">${p.value}</td><td class="mut">${p.usedCount}/${p.maxUses}</td><td><button class="btn sec sm" onclick="editPromo('${p.id}',${p.value},${p.maxUses})">изм.</button> <button class="btn bad sm" onclick="delPromo('${p.id}')">×</button></td></tr>`).join('') + '</table>'
       : '<span class="mut">нет промокодов</span>';
   } catch (e) { document.getElementById('pm_list').textContent = e.message; }
 };
@@ -566,6 +579,13 @@ async function addPromo() {
   try { await api('/promo', { method: 'POST', body: JSON.stringify(body) }); toast('промокод создан'); RENDER.promo(); } catch (e) { toast(e.message); }
 }
 async function delPromo(id) { if (!confirm('Удалить промокод?')) return; try { await api('/promo/' + id, { method: 'DELETE' }); RENDER.promo(); } catch (e) { toast(e.message); } }
+async function editPromo(id, value, maxUses) {
+  const v = prompt('Значение промокода:', value);
+  if (v === null) return;
+  const m = prompt('Макс. использований:', maxUses);
+  if (m === null) return;
+  try { await api('/promo/' + id, { method: 'PATCH', body: JSON.stringify({ value: Number(v), maxUses: Number(m) }) }); toast('промокод изменён'); RENDER.promo(); } catch (e) { toast(e.message); }
+}
 
 // ── ПЛАТЁЖКИ ─────────────────────────────────────────────────────────────────
 RENDER.payments = async function () {

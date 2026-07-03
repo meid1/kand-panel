@@ -255,17 +255,25 @@ async function openUser(id) {
     let bp = null; try { bp = await api('/bypass/' + id); } catch (e) { /* нет данных */ }
     const bpLine = bp ? (bp.unlimited ? 'Обход: безлимит'
       : `Обход: ${bp.remainingGb != null ? bp.remainingGb.toFixed(1) : '?'} ГБ осталось (из ${bp.capGb.toFixed(1)}, использовано ${bp.usedGb.toFixed(1)})${bp.suspended ? ' — 🚫 ИСЧЕРПАН' : ''}`) : '';
-    const devs = (u.devices || []).map((d) => `<tr><td>${esc(d.name)}</td><td class="mut">${esc(d.subToken.slice(0, 10))}…</td>`
-      + `<td><code>/sub/${esc(d.subToken)}</code></td></tr>`).join('');
-    document.getElementById('u_card').innerHTML = '<div class="card"><b>' + esc(u.tgName || u.tgId) + '</b>'
-      + `<div class="mut">tenant: ${u.tenant ? esc(u.tenant.brand) : '—'} · до ${u.expireAt ? new Date(u.expireAt).toLocaleString() : '—'}</div>`
+    const base = location.origin;
+    const devs = (u.devices || []).map((d) => {
+      const link = `${base}/sub/${d.subToken}`;
+      return `<tr><td>${esc(d.name)}</td>`
+        + `<td class="mut">${esc(d.subToken.slice(0, 10))}…</td>`
+        + `<td><button class="btn sec sm" onclick='copyText(${JSON.stringify(link)})'>📋 ссылка</button>`
+        + ` <button class="btn bad sm" onclick="delDevice('${id}','${d.id}')">×</button></td></tr>`;
+    }).join('');
+    document.getElementById('u_card').innerHTML = '<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><b>' + esc(u.tgName || u.tgUsername || u.tgId) + '</b>'
+      + `<button class="btn ${u.isBlocked ? '' : 'bad'} sm" onclick="toggleBlock('${id}',${!u.isBlocked})">${u.isBlocked ? '🔓 Разблокировать' : '🚫 Заблокировать'}</button></div>`
+      + `<div class="mut">ID ${u.tgId} · тариф до ${u.expireAt ? new Date(u.expireAt).toLocaleString() : '—'}${u.isBlocked ? ' · <span class="pill bad">заблокирован</span>' : ''}</div>`
       + '<div class="row" style="margin:10px 0"><input id="u_days" type="number" placeholder="дней (+/−)" style="max-width:140px">'
       + `<button class="btn sm" onclick="grantDays('${id}')">начислить/списать дни</button></div>`
       + `<div class="row" style="margin:0 0 10px"><span class="mut">Баланс: <b>${Number(u.balance||0)}₽</b></span><input id="u_bal" type="number" placeholder="₽ (+/−)" style="max-width:120px"><button class="btn sm" onclick="adjBal('${id}')">изменить баланс</button></div>`
       + `<div class="mut" style="margin:6px 0">${esc(bpLine)}</div>`
       + '<div class="row" style="margin:0 0 10px"><input id="u_gb" type="number" placeholder="ГБ обхода" style="max-width:130px">'
       + `<button class="btn sm" onclick="bypassGb('${id}',true)">+ докупить</button>`
-      + `<button class="btn sec sm" onclick="bypassGb('${id}',false)">− списать</button></div>`
+      + `<button class="btn sec sm" onclick="bypassGb('${id}',false)">− списать</button>`
+      + `<button class="btn sec sm" onclick="resetBypass('${id}')">↺ обнулить счётчик</button></div>`
       + `<div style="margin:6px 0"><button class="btn sec sm" onclick="diagnose('${id}')">🩺 Диагностика</button><span id="diag_${id}" class="mut" style="margin-left:8px"></span></div>`
       + '<b class="mut">Устройства (подписки)</b><table>' + (devs || '<tr><td class="mut">нет</td></tr>') + '</table>'
       + `<button class="btn sec sm" style="margin-top:8px" onclick="addDevice('${id}')">+ устройство</button>`
@@ -303,6 +311,18 @@ async function bypassGb(id, add) {
   const gb = parseFloat(document.getElementById('u_gb').value);
   if (!gb || gb <= 0) return toast('введи число ГБ');
   try { await api('/bypass/' + id + (add ? '/add' : '/deduct'), { method: 'POST', body: JSON.stringify({ gb }) }); toast(add ? 'докуплено' : 'списано'); openUser(id); } catch (e) { toast(e.message); }
+}
+function copyText(t) { navigator.clipboard.writeText(t); toast('скопировано'); }
+async function toggleBlock(id, block) {
+  try { await api('/users/' + id + '/block', { method: 'PATCH', body: JSON.stringify({ blocked: block }) }); toast(block ? 'заблокирован' : 'разблокирован'); openUser(id); } catch (e) { toast(e.message); }
+}
+async function resetBypass(id) {
+  if (!confirm('Обнулить счётчик обхода клиента (использованные ГБ → 0)?')) return;
+  try { await api('/bypass/' + id + '/reset', { method: 'POST' }); toast('счётчик обнулён'); openUser(id); } catch (e) { toast(e.message); }
+}
+async function delDevice(id, did) {
+  if (!confirm('Удалить устройство? Его ссылка подписки перестанет работать.')) return;
+  try { await api('/devices/' + did, { method: 'DELETE' }); toast('устройство удалено'); openUser(id); } catch (e) { toast(e.message); }
 }
 async function grantDays(id) {
   const days = parseInt(document.getElementById('u_days').value, 10);

@@ -2,157 +2,260 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Личный кабинет</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#0B0E14;--bg2:#060c1c;--card:#141925;--cardhi:#1A2030;--line:#1b2740;
-        --accent:#22D3EE;--accent2:#7dd3fc;--ok:#34D399;--err:#F87171;--gold:#FBBF24;--txt:#E5E7EB;--mut:#94A3B8;--dim:#5d6b86}
-  *{box-sizing:border-box}
-  body{margin:0;background:radial-gradient(1200px 600px at 50% -10%, #10243a 0%, var(--bg) 55%);color:var(--txt);
-       font-family:'Inter',system-ui,sans-serif;letter-spacing:-.01em;-webkit-font-smoothing:antialiased;min-height:100vh}
-  .wrap{max-width:540px;margin:0 auto;padding:22px 16px 48px}
-  .brand{display:flex;align-items:center;gap:11px;margin:6px 0 22px}
-  .brand .dot{width:14px;height:14px;border-radius:50%;background:var(--accent);box-shadow:0 0 22px var(--accent)}
-  .brand h1{font-size:21px;font-weight:800;margin:0}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin:0 0 14px}
-  .status{display:flex;align-items:center;justify-content:space-between}
-  .big{font-size:34px;font-weight:800;line-height:1.05;background:linear-gradient(90deg,#fff,var(--accent2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-  .sub{color:var(--mut);font-size:13px;margin-top:5px}
-  .badge{font-size:12px;font-weight:700;padding:6px 12px;border-radius:20px}
-  .badge.ok{background:rgba(52,211,153,.14);color:var(--ok)} .badge.err{background:rgba(255,77,109,.14);color:var(--err)}
-  .bar{height:10px;border-radius:6px;background:#0c1526;overflow:hidden;margin:10px 0 6px}
-  .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
-  .lbl{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;margin-bottom:10px}
-  .dev{border-top:1px solid var(--line);padding-top:14px;margin-top:14px}
+  :root{--bg:#0A0E17;--card:#141A28;--card2:#1A2130;--line:#212a3d;--acc:#22D3EE;--acc2:#7dd3fc;
+        --ok:#34D399;--warn:#FBBF24;--err:#F87171;--txt:#EAF0F7;--mut:#8FA0B6;--dim:#5c6b83}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:'Inter',system-ui,sans-serif;letter-spacing:-.011em;
+       -webkit-font-smoothing:antialiased;min-height:100vh;
+       background-image:radial-gradient(900px 500px at 50% -8%, color-mix(in srgb,var(--acc) 16%, transparent) 0%, transparent 60%)}
+  .wrap{max-width:540px;margin:0 auto;padding:20px 15px calc(40px + env(safe-area-inset-bottom))}
+  .top{display:flex;align-items:center;gap:11px;margin:4px 2px 20px}
+  .top .mark{width:30px;height:30px;flex:none}
+  .top b{font-size:18px;font-weight:800}
+  .top .spt{margin-left:auto}
+  .iconbtn{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);color:var(--mut);
+           border-radius:11px;padding:8px 12px;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;transition:.15s}
+  .iconbtn:hover{border-color:var(--acc);color:var(--txt)}
+  .iconbtn svg{width:15px;height:15px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin:0 0 13px;
+        opacity:0;transform:translateY(10px);animation:rise .5s cubic-bezier(.2,.7,.3,1) forwards}
+  .card:nth-child(2){animation-delay:.04s}.card:nth-child(3){animation-delay:.08s}.card:nth-child(4){animation-delay:.12s}.card:nth-child(5){animation-delay:.16s}
+  @keyframes rise{to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.card{animation:none;opacity:1;transform:none}}
+  /* герой-статус */
+  .hero{display:flex;align-items:center;gap:18px;
+        background:linear-gradient(150deg, color-mix(in srgb,var(--acc) 14%, var(--card)) 0%, var(--card) 55%);
+        border-color:color-mix(in srgb,var(--acc) 26%, var(--line))}
+  .ring{position:relative;width:104px;height:104px;flex:none}
+  .ring svg{transform:rotate(-90deg)} .ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .ring .n{font-size:30px;font-weight:900;line-height:1} .ring .u{font-size:11px;color:var(--mut);margin-top:2px;font-weight:600}
+  .hero .info{min-width:0;flex:1}
+  .hero .st{font-size:13px;color:var(--mut);margin-bottom:7px}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:5px 11px;border-radius:20px}
+  .pill.ok{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
+  .pill.err{background:color-mix(in srgb,var(--err) 15%,transparent);color:var(--err)}
+  .pill.warn{background:color-mix(in srgb,var(--warn) 15%,transparent);color:var(--warn)}
+  .pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 7px currentColor}
+  .bal{display:inline-flex;align-items:center;gap:7px;margin-top:11px;font-size:13px;color:var(--mut)}
+  .bal b{color:var(--txt);font-size:15px}
+  .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--mut);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .lbl svg{width:15px;height:15px;color:var(--acc)}
+  .lbl .cnt{margin-left:auto;background:var(--card2);border:1px solid var(--line);color:var(--mut);border-radius:20px;padding:2px 9px;font-size:11px;letter-spacing:0}
+  /* обход */
+  .bar{height:9px;border-radius:6px;background:#0c1526;overflow:hidden;margin:12px 0 8px}
+  .bar>i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .6s}
+  .bar>i.hot{background:linear-gradient(90deg,#f59e0b,var(--err))}
+  .muted{color:var(--mut);font-size:13px}
+  /* устройства */
+  .dev{border-top:1px solid var(--line);padding-top:15px;margin-top:15px}
   .dev:first-of-type{border-top:0;margin-top:0;padding-top:0}
-  .dev .nm{font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .dev .h{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .dev .h .di{width:34px;height:34px;border-radius:10px;background:var(--card2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--acc);flex:none}
+  .dev .h .di svg{width:18px;height:18px}
+  .dev .h .nm{font-weight:700;font-size:15px}
   .apps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-  .appbtn{display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;background:#0e1a2c;border:1px solid var(--line);
-          color:var(--txt);font-weight:700;font-size:13px;padding:11px 6px;border-radius:13px;transition:.15s}
-  .appbtn:hover{border-color:var(--accent);background:#12233a}
-  .appbtn.primary{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#00131a;border:0}
-  .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-  .btn{background:#182339;border:1px solid var(--line);color:var(--txt);font-weight:600;padding:9px 13px;border-radius:12px;font:inherit;font-weight:600;cursor:pointer}
-  .btn.sm{padding:7px 11px;font-size:13px} .btn.acc{background:var(--accent);color:#00131a;border:0;font-weight:700}
-  .btn.block{display:block;width:100%;text-align:center}
-  .hint{background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.18);border-radius:13px;padding:10px 12px;font-size:13px;color:var(--mut);margin-top:6px}
-  .pays{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-  .guide-step{display:flex;gap:11px;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
-  .guide-step:first-child{border-top:0}
-  .guide-step .n{flex:none;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#00131a;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px}
-  .mut{color:var(--mut)} .center{text-align:center}
-  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#0c1119;border:1px solid var(--line);padding:11px 17px;border-radius:12px}
-  .foldbtn{cursor:pointer;user-select:none}
+  .app{display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;background:var(--card2);border:1px solid var(--line);
+       color:var(--txt);font-weight:600;font-size:13px;padding:11px 6px;border-radius:12px;transition:.15s}
+  .app:hover{border-color:var(--acc)} .app.primary{background:linear-gradient(90deg,var(--acc),var(--acc2));color:#05121a;border:0}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+  .btn{display:inline-flex;align-items:center;gap:7px;background:var(--card2);border:1px solid var(--line);color:var(--txt);
+       font-weight:600;font-size:13px;padding:9px 13px;border-radius:11px;cursor:pointer;font-family:inherit;transition:.15s}
+  .btn:hover{border-color:var(--acc)} .btn svg{width:15px;height:15px;color:var(--acc)}
+  .btn.grow{flex:1;justify-content:center}
+  .btn.acc{background:var(--acc);color:#05121a;border:0} .btn.acc svg{color:#05121a}
+  .qr{display:none;text-align:center;padding:14px 0} .qr.on{display:block}
+  .qr .box{background:#fff;border-radius:16px;padding:12px;display:inline-block}
+  .qr .box svg{width:190px;height:190px;display:block}
+  .tvb{display:none;margin-top:10px} .tvb.on{display:block}
+  .hint{background:color-mix(in srgb,var(--acc) 7%,transparent);border:1px solid color-mix(in srgb,var(--acc) 20%,transparent);
+        border-radius:13px;padding:11px 13px;font-size:13px;color:var(--mut);margin-top:14px;display:flex;gap:9px}
+  .hint svg{width:17px;height:17px;color:var(--acc);flex:none;margin-top:1px}
+  .hint b{color:var(--txt)}
+  .code{text-align:center;font-size:26px;font-weight:800;letter-spacing:4px;color:var(--txt);margin:10px 0}
+  /* продление */
+  .renew .price{display:flex;align-items:baseline;gap:9px;margin-bottom:14px}
+  .renew .price b{font-size:26px;font-weight:800} .renew .price span{color:var(--mut);font-size:14px}
+  .pays{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .fold{cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between}
+  .fold .chev{transition:.2s;color:var(--mut)} .fold.on .chev{transform:rotate(180deg)}
+  .guide{display:none;margin-top:6px} .guide.on{display:block}
+  .step{display:flex;gap:12px;padding:11px 0;border-top:1px solid var(--line);font-size:14px}
+  .step:first-child{border-top:0}
+  .step .n{flex:none;width:25px;height:25px;border-radius:8px;background:color-mix(in srgb,var(--acc) 15%,transparent);color:var(--acc);
+           font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px}
+  .toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);
+         background:#0c1119;border:1px solid var(--line);padding:11px 18px;border-radius:13px;opacity:0;transition:.25s;z-index:60;font-size:14px;font-weight:600}
+  .toast.on{opacity:1;transform:translateX(-50%)}
+  .foot{text-align:center;color:var(--dim);font-size:12px;margin-top:18px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="brand"><span class="dot"></span><h1 id="brand">Кабинет</h1></div>
-  <div id="app"><div class="card center mut">Загрузка…</div></div>
+  <div class="top">
+    <svg class="mark" viewBox="0 0 128 128"><defs><linearGradient id="kg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2ee6ff"/><stop offset="1" stop-color="#3B82F6"/></linearGradient></defs><line x1="40" y1="64" x2="104" y2="18" stroke="url(#kg)" stroke-width="22" stroke-linecap="round"/><line x1="40" y1="64" x2="104" y2="110" stroke="url(#kg)" stroke-width="22" stroke-linecap="round"/><rect x="20" y="14" width="24" height="100" rx="8" fill="url(#kg)"/></svg>
+    <b id="brand">Кабинет</b>
+    <span id="sptWrap" class="spt"></span>
+  </div>
+  <div id="app"><div class="card muted" style="text-align:center">Загрузка…</div></div>
+  <div class="foot" id="foot"></div>
 </div>
+<div class="toast" id="toast"></div>
 <script>
 const token = location.pathname.split('/')[2] || '';
 const $ = (id) => document.getElementById(id);
-function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2200);}
-function copy(s){navigator.clipboard?.writeText(s).then(()=>toast('Скопировано'),()=>toast(s));}
-function fold(id){const el=$(id);if(el)el.style.display=el.style.display==='none'?'block':'none';}
-const esc=(s)=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const enc=encodeURIComponent;
-
-// приложения и их deep-link импорта подписки (открывают приложение и добавляют ссылку сами)
+const enc = encodeURIComponent;
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2000);}
+function copy(s){(navigator.clipboard?navigator.clipboard.writeText(s):Promise.reject()).then(()=>toast('Ссылка скопирована'),()=>toast('Скопируйте вручную'));}
+// SVG-иконки (линейные, без эмодзи)
+const IC={
+  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  qr:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M20 14v.01M14 20v.01M20 20v.01M17 20h.01M20 17h.01"/></svg>',
+  tv:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg>',
+  phone:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>',
+  laptop:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="11" rx="1.5"/><path d="M2 20h20"/></svg>',
+  device:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M10 18h4"/></svg>',
+  bolt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4.5 13.5H11l-1 8.5L20 9.5h-6.5z"/></svg>',
+  shield:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5l8 3v6.5c0 4.4-3.3 7.6-8 9.5-4.7-1.9-8-5.1-8-9.5V5.5z"/></svg>',
+  devices:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="12" height="9" rx="1.5"/><rect x="16" y="8" width="5" height="11" rx="1.5"/><path d="M3 18h9"/></svg>',
+  card:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/></svg>',
+  book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 5v14"/></svg>',
+  chevron:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>',
+  chat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5z"/></svg>',
+};
 const APPS=[
-  {n:'Happ',      u:(s)=>`happ://add/${enc(s)}`},
+  {n:'Happ',      u:(s)=>`happ://add/${enc(s)}`, primary:true},
   {n:'v2rayNG',   u:(s)=>`v2rayng://install-sub?url=${enc(s)}`},
   {n:'Streisand', u:(s)=>`streisand://import/${enc(s)}`},
   {n:'Hiddify',   u:(s)=>`hiddify://import/${enc(s)}`},
   {n:'NekoBox',   u:(s)=>`sn://subscription?url=${enc(s)}`},
   {n:'Clash',     u:(s)=>`clash://install-config?url=${enc(s)}`},
 ];
+// безопасное создание элементов (без innerHTML для пользовательских данных)
+function el(tag, cls, txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;}
+function deviceIcon(name){const n=(name||'').toLowerCase();
+  if(/tv|телевизор|box/.test(n))return IC.tv;
+  if(/пк|windows|mac|ноут|laptop|комп|pc/.test(n))return IC.laptop;
+  if(/iphone|android|phone|телефон|samsung|xiaomi/.test(n))return IC.phone;
+  return IC.device;}
+
+function ring(daysLeft, active){
+  const max=30, pct=active&&daysLeft!=null?Math.max(4,Math.min(100,daysLeft/max*100)):(active?100:0);
+  const r=46, c=2*Math.PI*r, off=c*(1-pct/100);
+  const col=!active?'var(--err)':(daysLeft!=null&&daysLeft<=3?'var(--warn)':'var(--acc)');
+  const n=active?(daysLeft!=null?daysLeft:'∞'):'0';
+  const u=active?(daysLeft!=null?'дней':'безлимит'):'неактивна';
+  return `<div class="ring"><svg width="104" height="104" viewBox="0 0 104 104">
+    <circle cx="52" cy="52" r="${r}" fill="none" stroke="#0c1526" stroke-width="9"/>
+    <circle cx="52" cy="52" r="${r}" fill="none" stroke="${col}" stroke-width="9" stroke-linecap="round"
+      stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" style="transition:stroke-dashoffset .8s"/>
+  </svg><div class="val"><div class="n" style="color:${col}">${n}</div><div class="u">${u}</div></div></div>`;
+}
 
 async function load(){
   let d;
   try{ const r=await fetch(`/api/cabinet/${token}/data`); if(!r.ok) throw 0; d=await r.json(); }
-  catch{ $('app').innerHTML='<div class="card center" style="color:var(--err)">Кабинет не найден или ссылка устарела.</div>'; return; }
-  document.documentElement.style.setProperty('--accent', d.accent||'#00d4ff');
+  catch{ $('app').innerHTML='<div class="card" style="text-align:center;color:var(--err)">Кабинет не найден или ссылка устарела.</div>'; return; }
+  if(d.accent) document.documentElement.style.setProperty('--acc', d.accent);
   $('brand').textContent = d.brand||'Кабинет';
-  document.title = (d.brand||'Кабинет')+' — личный кабинет';
+  document.title=(d.brand||'Кабинет')+' — личный кабинет';
+  $('foot').textContent=(d.brand||'')+' · личный кабинет';
+  // кнопка поддержки
+  if(d.support){ const a=document.createElement('a'); a.className='iconbtn'; a.href=d.support.startsWith('http')||d.support.startsWith('tg')?d.support:('https://t.me/'+String(d.support).replace(/^@/,'')); a.target='_blank'; a.rel='noopener'; a.innerHTML=IC.chat+'<span>Поддержка</span>'; $('sptWrap').appendChild(a); }
 
+  const app=$('app'); app.textContent='';
   const bp=d.bypass||{};
-  const usedPct=(!bp.unlimited&&bp.capGb)?Math.min(100,Math.round((bp.usedGb/bp.capGb)*100)):0;
-  const bypassBlock=bp.unlimited
-    ?`<div class="lbl">Обход белых списков</div><div>Безлимит</div>`
-    :`<div class="lbl">Обход белых списков ${bp.suspended?'<span class="badge err" style="margin-left:6px">исчерпан</span>':''}</div>
-      <div class="bar"><i style="width:${usedPct}%"></i></div>
-      <div class="sub">${(bp.remainingGb??0).toFixed(1)} ГБ осталось из ${(bp.capGb??0).toFixed(1)}</div>`;
 
-  const devs=(d.devices||[]).map((dev,i)=>{
-    const appBtns=APPS.map(a=>`<a class="appbtn${a.n==='Happ'?' primary':''}" href="${a.u(dev.smart)}">${a.n}</a>`).join('');
-    return `<div class="dev">
-      <div class="nm">📱 ${esc(dev.name)}</div>
-      <div class="apps">${appBtns}</div>
-      <div class="row">
-        <button class="btn sm" onclick="copy('${esc(dev.smart)}')">🔗 Скопировать ссылку</button>
-        <button class="btn sm" onclick="fold('qr${i}')">QR-код</button>
-        ${dev.tv?`<button class="btn sm" onclick="fold('tv${i}')">📺 Телевизор</button>`:''}
-      </div>
-      <div id="qr${i}" style="display:none;text-align:center;padding:12px 0">
-        <img src="/api/cabinet/${token}/qr/${i}" width="210" height="210" style="background:#fff;border-radius:14px;padding:8px"/>
-        <div class="mut" style="font-size:12px;margin-top:6px">Отсканируйте в приложении</div>
-      </div>
-      ${dev.tv?`<div id="tv${i}" style="display:none;padding:12px 0" class="hint">
-        📺 На телевизоре (Android TV): установите Happ или v2rayNG, добавьте подписку по короткому адресу или коду:
-        <div class="center" style="font-size:24px;font-weight:800;letter-spacing:3px;color:var(--txt);margin:8px 0">${esc(dev.tvCode||'')}</div>
-        <div class="center mut" style="font-size:13px">${esc(dev.tv)}</div>
-        <button class="btn sm block acc" style="margin-top:8px" onclick="copy('${esc(dev.tv)}')">Скопировать ТВ-ссылку</button>
-      </div>`:''}
-    </div>`;
-  }).join('') || '<div class="mut center">нет устройств</div>';
+  // ── герой-статус ──
+  const hero=el('div','card hero');
+  hero.innerHTML=ring(d.daysLeft, d.active);
+  const info=el('div','info');
+  const dateStr=d.expireAt?new Date(d.expireAt).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}):'—';
+  info.appendChild(el('div','st', d.active? 'Подписка активна до '+dateStr : (d.expireAt?'Истекла '+dateStr:'Подписка не активна')));
+  const pill=el('span','pill '+(d.active?'ok':'err')); pill.innerHTML='<span class="dot"></span>'+(d.active?'активна':'истекла'); info.appendChild(pill);
+  if(d.balance>0){ const b=el('div','bal'); b.innerHTML='Баланс: <b>'+d.balance+' ₽</b>'; info.appendChild(b); }
+  hero.appendChild(info);
+  app.appendChild(hero);
 
-  const pays=(d.payMethods||[]).map(m=>`<button class="btn acc" onclick="buy('${m.id}')">${esc(m.title)}</button>`).join('')
-    ||'<div class="mut center" style="grid-column:1/3">оплата недоступна</div>';
+  // ── обход белых списков ──
+  if(bp && (bp.unlimited || bp.capGb!=null)){
+    const c=el('div','card');
+    const lbl=el('div','lbl'); lbl.innerHTML=IC.shield+'Обход белых списков';
+    if(bp.suspended){const s=el('span','pill warn');s.style.marginLeft='auto';s.textContent='исчерпан';lbl.appendChild(s);}
+    c.appendChild(lbl);
+    if(bp.unlimited){ c.appendChild(el('div',null,'Безлимитный обход')); }
+    else {
+      const used=bp.usedGb||0, cap=bp.capGb||0, pct=cap?Math.min(100,used/cap*100):0;
+      const bar=el('div','bar'); const i=el('i'); i.style.width=pct+'%'; if(pct>85)i.className='hot'; bar.appendChild(i); c.appendChild(bar);
+      c.appendChild(el('div','muted', (bp.remainingGb!=null?bp.remainingGb.toFixed(1):'0')+' ГБ осталось из '+(cap||0).toFixed(1)));
+    }
+    app.appendChild(c);
+  }
 
-  $('app').innerHTML=`
-    <div class="card">
-      <div class="status">
-        <div>
-          <div class="big">${d.active?(d.daysLeft!=null?d.daysLeft+' дн.':'Активна'):'Неактивна'}</div>
-          <div class="sub">${d.expireAt?'подписка до '+new Date(d.expireAt).toLocaleDateString('ru-RU'):'подписка'}</div>
-        </div>
-        <span class="badge ${d.active?'ok':'err'}">${d.active?'активна':'истекла'}</span>
-      </div>
-      ${d.balance>0?`<div class="sub" style="margin-top:8px">💰 Баланс: <b style="color:var(--txt)">${d.balance}₽</b></div>`:''}
-      <div style="margin-top:16px">${bypassBlock}</div>
-    </div>
+  // ── устройства ──
+  const dc=el('div','card');
+  const dl=el('div','lbl'); dl.innerHTML=IC.devices+'Мои устройства<span class="cnt">'+(d.devices||[]).length+'</span>'; dc.appendChild(dl);
+  if(!(d.devices||[]).length){ dc.appendChild(el('div','muted','Пока нет устройств')); }
+  (d.devices||[]).forEach((dev,i)=>{
+    const wrap=el('div','dev');
+    const h=el('div','h'); const di=el('div','di'); di.innerHTML=deviceIcon(dev.name); h.appendChild(di); h.appendChild(el('div','nm',dev.name||'Устройство')); wrap.appendChild(h);
+    // приложения (deep-links — href безопасен через setAttribute)
+    const apps=el('div','apps');
+    APPS.forEach(a=>{ const link=document.createElement('a'); link.className='app'+(a.primary?' primary':''); link.setAttribute('href',a.u(dev.smart)); link.textContent=a.n; apps.appendChild(link); });
+    wrap.appendChild(apps);
+    // действия
+    const row=el('div','row');
+    const cp=el('button','btn grow'); cp.innerHTML=IC.copy+'<span>Скопировать ссылку</span>'; cp.addEventListener('click',()=>copy(dev.smart)); row.appendChild(cp);
+    const qb=el('button','btn'); qb.innerHTML=IC.qr+'<span>QR</span>'; row.appendChild(qb);
+    if(dev.tv){ const tb=el('button','btn'); tb.innerHTML=IC.tv+'<span>ТВ</span>'; row.appendChild(tb);
+      const tv=el('div','tvb'); const hint=el('div','hint'); hint.innerHTML=IC.info+'<div>На <b>Android TV</b>: установите Happ или v2rayNG и добавьте подписку по короткому коду ниже.</div>';
+      tv.appendChild(hint); tv.appendChild(el('div','code',dev.tvCode||''));
+      const cpt=el('button','btn acc grow'); cpt.style.marginTop='6px'; cpt.innerHTML=IC.copy+'<span>Скопировать ТВ-ссылку</span>'; cpt.addEventListener('click',()=>copy(dev.tv));
+      tv.appendChild(cpt); wrap.appendChild(row); wrap.appendChild(tv);
+      tb.addEventListener('click',()=>tv.classList.toggle('on'));
+    } else { wrap.appendChild(row); }
+    // QR
+    const qr=el('div','qr'); const boxw=el('div','box'); qr.appendChild(boxw); qr.appendChild(el('div','muted','Отсканируйте в приложении'));
+    wrap.appendChild(qr);
+    let qrLoaded=false;
+    qb.addEventListener('click',async()=>{ qr.classList.toggle('on'); if(qr.classList.contains('on')&&!qrLoaded){ qrLoaded=true; try{ const t=await (await fetch(`/api/cabinet/${token}/qr/${i}`)).text(); boxw.innerHTML=t; }catch{ boxw.textContent='—'; } } });
+    dc.appendChild(wrap);
+  });
+  const hint=el('div','hint'); hint.innerHTML=IC.bolt+'<div><b>Умная</b> подписка (рекомендуется): российские сайты идут напрямую, YouTube без рекламы, остальное через VPN. Кнопки приложений добавляют именно её.</div>'; dc.appendChild(hint);
+  app.appendChild(dc);
 
-    <div class="card">
-      <div class="lbl">Мои устройства</div>
-      ${devs}
-      <div class="hint" style="margin-top:14px">💡 <b>Умная</b> подписка — рекомендуется: российские сайты идут напрямую, YouTube без рекламы, остальное через VPN. Кнопки приложений добавляют именно её.</div>
-    </div>
+  // ── продление ──
+  const rc=el('div','card renew');
+  rc.appendChild((()=>{const l=el('div','lbl');l.innerHTML=IC.card+'Продлить подписку';return l;})());
+  const price=el('div','price'); price.innerHTML='<b>'+((d.plan&&d.plan.price)||90)+' ₽</b><span>за '+((d.plan&&d.plan.days)||30)+' дней</span>'; rc.appendChild(price);
+  const pays=el('div','pays');
+  const methods=d.payMethods||[];
+  if(!methods.length){ const m=el('div','muted','Оплата временно недоступна'); m.style.gridColumn='1/3'; pays.appendChild(m); }
+  methods.forEach(m=>{ const b=el('button','btn acc grow'); b.innerHTML=IC.card+'<span>'+(m.title||'Оплатить')+'</span>'; b.addEventListener('click',()=>buy(m.id,b)); pays.appendChild(b); });
+  rc.appendChild(pays); app.appendChild(rc);
 
-    <div class="card">
-      <div class="lbl">Продлить подписку</div>
-      <div class="pays">${pays}</div>
-    </div>
-
-    <div class="card">
-      <div class="lbl foldbtn" onclick="fold('guide')">📖 Как подключить &nbsp;<span class="mut" style="font-size:12px">(нажмите)</span></div>
-      <div id="guide" style="display:none">
-        <div class="guide-step"><span class="n">1</span><div>Установите приложение: <b>Happ</b> (проще всего), v2rayNG, Streisand или Hiddify — из App Store / Google Play.</div></div>
-        <div class="guide-step"><span class="n">2</span><div>Нажмите кнопку вашего приложения выше — подписка добавится <b>автоматически</b> в один тап.</div></div>
-        <div class="guide-step"><span class="n">3</span><div>Если не сработало — «Скопировать ссылку» и вставьте в приложении вручную.</div></div>
-        <div class="guide-step"><span class="n">4</span><div>Выберите сервер и включите VPN. Готово 🎉</div></div>
-        <div class="guide-step"><span class="n">📺</span><div>Телевизор: приложение из Google Play → добавить подписку по короткому ТВ-адресу (кнопка «Телевизор»).</div></div>
-      </div>
-    </div>`;
+  // ── гайд ──
+  const gc=el('div','card');
+  const fold=el('div','lbl fold'); fold.style.marginBottom='0'; fold.innerHTML=IC.book+'Как подключить<span class="chev" style="margin-left:auto">'+IC.chevron+'</span>';
+  const guide=el('div','guide');
+  [['1','Установите приложение <b>Happ</b> (проще всего), v2rayNG, Streisand или Hiddify из App Store / Google Play.'],
+   ['2','Нажмите кнопку вашего приложения выше — подписка добавится <b>автоматически</b> в один тап.'],
+   ['3','Если не сработало — «Скопировать ссылку» и вставьте её в приложении вручную.'],
+   ['4','Выберите сервер и включите VPN. Готово.'],
+   ['ТВ','Телевизор: приложение из Google Play → добавить подписку по короткому ТВ-коду (кнопка «ТВ»).']
+  ].forEach(([n,t])=>{ const s=el('div','step'); const num=el('div','n',n); const tx=document.createElement('div'); tx.innerHTML=t; s.appendChild(num); s.appendChild(tx); guide.appendChild(s); });
+  fold.addEventListener('click',()=>{fold.classList.toggle('on');guide.classList.toggle('on');});
+  gc.appendChild(fold); gc.appendChild(guide); app.appendChild(gc);
 }
-async function buy(provider){
-  try{
-    const r=await fetch(`/api/cabinet/${token}/buy`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider})});
-    const d=await r.json();
-    if(d.url) location.href=d.url; else toast(d.message||'Ошибка оплаты');
-  }catch{ toast('Ошибка оплаты'); }
+async function buy(provider, btn){
+  if(btn){btn.disabled=true;}
+  try{ const r=await fetch(`/api/cabinet/${token}/buy`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider})});
+    const j=await r.json(); if(j.url) location.href=j.url; else { toast(j.message||'Ошибка оплаты'); if(btn)btn.disabled=false; } }
+  catch{ toast('Ошибка оплаты'); if(btn)btn.disabled=false; }
 }
 load();
 </script>

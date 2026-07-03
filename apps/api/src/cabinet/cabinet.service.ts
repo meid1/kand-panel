@@ -35,6 +35,9 @@ export class CabinetService {
     const user = await this.resolve(token);
     const brand = await this.settings.brand();
     const accent = (await this.prisma.setting.findUnique({ where: { key: 'brand.color' } }))?.value || '#00d4ff';
+    const support = (await this.prisma.setting.findUnique({ where: { key: 'brand.support' } }))?.value || null;
+    const planDays = Number((await this.prisma.setting.findUnique({ where: { key: 'plan.days' } }))?.value) || 30;
+    const planPrice = Number((await this.prisma.setting.findUnique({ where: { key: 'plan.price' } }))?.value) || 90;
     const bp = await this.bypass.state(user.id);
     const devices = await this.prisma.device.findMany({
       where: { userId: user.id }, orderBy: { createdAt: 'asc' },
@@ -43,7 +46,7 @@ export class CabinetService {
     const now = Date.now();
     const active = !user.isBlocked && (!user.expireAt || user.expireAt.getTime() > now);
     return {
-      brand, accent,
+      brand, accent, support, plan: { days: planDays, price: planPrice },
       active,
       balance: Number(user.balance || 0),
       expireAt: user.expireAt,

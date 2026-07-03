@@ -33,4 +33,10 @@ export class BypassController {
   resetAll() {
     return this.bypass.resetAll();
   }
+
+  // тумблер «С обходом / Без обхода» (has_bypass в живом бэкенде)
+  @Post(':userId/toggle')
+  toggle(@Param('userId') userId: string, @Body('on') on: boolean) {
+    return this.bypass.setBypassFlag(userId, !!on);
+  }
 }

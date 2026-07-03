@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { BridgeService } from '../bridge/bridge.service';
 
 const GB = 1024n * 1024n * 1024n;
 const PERIOD_MS = 30 * 24 * 3600 * 1000;
@@ -16,7 +17,13 @@ const PERIOD_MS = 30 * 24 * 3600 * 1000;
 @Injectable()
 export class BypassService {
   private readonly log = new Logger(BypassService.name);
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private bridge: BridgeService) {}
+
+  /** email клиента во внешнем бэкенде = externalId (для моста). */
+  private async extEmail(userId: string): Promise<string | null> {
+    const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { externalId: true } });
+    return u?.externalId || null;
+  }
 
   private async defaultCapGb(): Promise<number> {
     const s = await this.prisma.setting.findUnique({ where: { key: 'bypass.default_cap_gb' } });
@@ -95,6 +102,8 @@ export class BypassService {
       where: { userId }, data: { purchasedBytes: { increment: BigInt(Math.round(gb)) * GB } },
     });
     await this.reevaluate(userId);
+    const em = await this.extEmail(userId);
+    if (em) await this.bridge.adjustBypassGb(em, gb); // проброс в живой бэкенд
     return this.state(userId);
   }
 
@@ -105,6 +114,8 @@ export class BypassService {
       where: { userId }, data: { purchasedBytes: { decrement: BigInt(Math.round(gb)) * GB } },
     });
     await this.reevaluate(userId);
+    const em = await this.extEmail(userId);
+    if (em) await this.bridge.adjustBypassGb(em, -gb); // проброс в живой бэкенд
     return this.state(userId);
   }
 
@@ -133,6 +144,8 @@ export class BypassService {
       where: { userId },
       data: { baselineBytes: 0n, totalBytes: 0n, isSuspended: false, periodStart: new Date() },
     });
+    const em = await this.extEmail(userId);
+    if (em) await this.bridge.resetTraffic(em); // сброс счётчика и в живом бэкенде
     return this.state(userId);
   }
 
@@ -142,6 +155,13 @@ export class BypassService {
       data: { baselineBytes: 0n, totalBytes: 0n, isSuspended: false },
     });
     return { ok: true, reset: r.count };
+  }
+
+  /** Тумблер «С обходом / Без обхода»: has_bypass в живом бэкенде. */
+  async setBypassFlag(userId: string, on: boolean) {
+    const em = await this.extEmail(userId);
+    if (em) await this.bridge.setHasBypass(em, on);
+    return { ok: true, hasBypass: on };
   }
 
   /** Быстрый флаг для подписки/реконсайла. */

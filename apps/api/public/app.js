@@ -359,6 +359,7 @@ async function openUser(id) {
       + `<button class="btn sm" onclick="bypassGb('${id}',true)">+ докупить</button>`
       + `<button class="btn sec sm" onclick="bypassGb('${id}',false)">− списать</button>`
       + `<button class="btn sec sm" onclick="resetBypass('${id}')">↺ обнулить счётчик</button></div>`
+      + `<div class="row" style="margin:0 0 10px"><span class="mut">Тумблер обхода:</span><button class="btn sec sm" onclick="toggleBypass('${id}',true)">🔥 С обходом</button><button class="btn sec sm" onclick="toggleBypass('${id}',false)">📶 Без обхода</button><button class="btn sec sm" onclick="forceEnable('${id}')">⚡ Принудительно включить ключ</button></div>`
       + `<div style="margin:6px 0"><button class="btn sec sm" onclick="diagnose('${id}')">🩺 Диагностика</button><span id="diag_${id}" class="mut" style="margin-left:8px"></span></div>`
       + '<b class="mut">Устройства (подписки)</b><table>' + (devs || '<tr><td class="mut">нет</td></tr>') + '</table>'
       + `<button class="btn sec sm" style="margin-top:8px" onclick="addDevice('${id}')">+ устройство</button>`
@@ -404,6 +405,12 @@ async function toggleBlock(id, block) {
 async function resetBypass(id) {
   if (!confirm('Обнулить счётчик обхода клиента (использованные ГБ → 0)?')) return;
   try { await api('/bypass/' + id + '/reset', { method: 'POST' }); toast('счётчик обнулён'); openUser(id); } catch (e) { toast(e.message); }
+}
+async function toggleBypass(id, on) {
+  try { await api('/bypass/' + id + '/toggle', { method: 'POST', body: JSON.stringify({ on }) }); toast(on ? 'обход включён' : 'обход выключен'); } catch (e) { toast(e.message); }
+}
+async function forceEnable(id) {
+  try { await api('/users/' + id + '/force-enable', { method: 'POST' }); toast('ключ принудительно включён'); openUser(id); } catch (e) { toast(e.message); }
 }
 async function delDevice(id, did) {
   if (!confirm('Удалить устройство? Его ссылка подписки перестанет работать.')) return;

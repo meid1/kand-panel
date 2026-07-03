@@ -41,6 +41,16 @@ export class BridgeService {
   setBypassGb(email: string, gb: number) { return this.patch(email, { totalGB: gb }); }
   setHasBypass(email: string, has: boolean) { return this.patch(email, { hasBypass: has }); }
   resetTraffic(email: string) { return this.patch(email, { resetTraffic: true }); }
+
+  /** Относительная докупка/списание лимита обхода: читаем текущий cap в бэкенде и меняем (без расхождений с его метрингом). */
+  async adjustBypassGb(email: string, deltaGb: number) {
+    return this.safe(async () => {
+      const c = await this.call('GET', `/v1/clients/by-email/${encodeURIComponent(email)}`);
+      const cur = Number(c?.data?.totalGB || 0);
+      const next = Math.max(0, cur + deltaGb);
+      await this.call('PATCH', `/v1/clients/by-email/${encodeURIComponent(email)}`, { totalGB: next });
+    }, `adjustGb ${email} ${deltaGb}`);
+  }
   deleteKey(email: string) {
     return this.safe(() => this.call('DELETE', `/v1/clients/by-email/${encodeURIComponent(email)}`), `delete ${email}`);
   }

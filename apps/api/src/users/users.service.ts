@@ -134,6 +134,14 @@ export class UsersService {
     return res;
   }
 
+  /** Force-enable: принудительно включить ключ клиента в живом бэкенде (+ снять блок). */
+  async forceEnable(id: string) {
+    const u = await this.findOne(id);
+    await this.prisma.user.update({ where: { id }, data: { isBlocked: false } });
+    if (u.externalId) await this.bridge.setEnabled(u.externalId, true);
+    return { ok: true };
+  }
+
   /** Ручное создание ключа (выдать кому-то без Telegram). tgId — уникальный отрицательный. */
   async createManual(name?: string, days?: number, tenantId?: string) {
     const tid = tenantId ?? (await this.platformTenantId());

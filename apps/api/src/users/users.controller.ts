@@ -60,6 +60,12 @@ export class UsersController {
     return this.users.setBlocked(id, blocked);
   }
 
+  // принудительно включить ключ в живом бэкенде
+  @Post(':id/force-enable')
+  forceEnable(@Param('id') id: string) {
+    return this.users.forceEnable(id);
+  }
+
   // корректировка баланса (amount +/−)
   @Post(':id/balance')
   balance(@Param('id') id: string, @Body('amount') amount: number) {

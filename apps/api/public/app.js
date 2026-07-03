@@ -1,5 +1,5 @@
 // Kand admin — vanilla JS, без сборки. Работает на статике, ходит в /api с JWT.
-const APP_VERSION = 'v0.14.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
+const APP_VERSION = 'v0.15.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
 const API = '/api';
 let TOKEN = localStorage.getItem('vp_token') || '';
 // показать версию (шапка + вход)
@@ -495,14 +495,24 @@ async function loadCdnNodes() {
     const r = await api('/bridge/nodes');
     if (!r.enabled || !r.nodes || !r.nodes.length) { box.innerHTML = ''; return; }
     window._cdnNodes = r.nodes;
-    box.innerHTML = '<div class="row" style="justify-content:space-between;color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:0 4px 6px"><span>Сервер (как видит клиент) · хост</span><span>в подписке</span></div>'
-      + r.nodes.map((n, i) => `<div class="srv">`
-        + `<span style="display:flex;flex-direction:column;gap:2px"><button class="btn sec sm" ${i === 0 ? 'disabled' : ''} onclick="cdnMove(${i},-1)" style="padding:0 7px;line-height:1.5">↑</button><button class="btn sec sm" ${i === r.nodes.length - 1 ? 'disabled' : ''} onclick="cdnMove(${i},1)" style="padding:0 7px;line-height:1.5">↓</button></span>`
-        + `<span class="dot ${n.hidden ? 'off' : 'on'}"></span>`
-        + `<span class="name">${esc(n.remark || '—')} <button class="btn sec sm" onclick='cdnRename(${i},${JSON.stringify(n.remark || '')})' style="padding:2px 7px" title="переименовать">✏️</button></span>`
-        + `<span class="mut grow" style="font-size:13px">${esc(n.host || '')}${n.port ? ':' + n.port : ''} · ${esc((n.protos || []).join(', '))}</span>`
-        + `<button class="sw ${n.hidden ? '' : 'on'}" onclick="cdnToggle(${i},${!n.hidden})" title="${n.hidden ? 'скрыт из подписки' : 'показан в подписке'}"></button>`
-        + `</div>`).join('')
+    const onlineCnt = r.nodes.filter((n) => n.online && n.xrayRunning).length;
+    box.innerHTML = '<div class="row" style="justify-content:space-between;color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:0 4px 8px"><span>Сервер (как видит клиент)</span><span>' + onlineCnt + ' из ' + r.nodes.length + ' онлайн · показ в подписке</span></div>'
+      + r.nodes.map((n, i) => {
+        const st = !n.online ? 'off' : (n.xrayRunning ? 'on' : 'warn');
+        const port = n.grpc_port || n.port;
+        const load = n.online ? `CPU ${(+n.cpu || 0).toFixed(0)}% · RAM ${(+n.ram || 0).toFixed(0)}%` : 'офлайн';
+        const net = n.online && (n.netRx || n.netTx) ? ` · ↓${(+n.netRx || 0).toFixed(1)}/↑${(+n.netTx || 0).toFixed(1)} МБ/с` : '';
+        const users = n.online ? `<span class="pill ${n.onlineUsers ? 'ok' : ''}" style="font-size:11px">👥 ${n.onlineUsers || 0} онлайн</span>` : '';
+        return `<div class="srv">`
+          + `<span style="display:flex;flex-direction:column;gap:2px"><button class="btn sec sm" ${i === 0 ? 'disabled' : ''} onclick="cdnMove(${i},-1)" style="padding:0 7px;line-height:1.5">↑</button><button class="btn sec sm" ${i === r.nodes.length - 1 ? 'disabled' : ''} onclick="cdnMove(${i},1)" style="padding:0 7px;line-height:1.5">↓</button></span>`
+          + `<span class="dot ${st}" title="${st === 'on' ? 'онлайн' : st === 'warn' ? 'xray не запущен' : 'офлайн'}"></span>`
+          + `<span class="grow" style="min-width:0;display:flex;flex-direction:column;gap:4px">`
+            + `<span class="row" style="gap:8px"><span class="name">${esc(n.remark || '—')} <button class="btn sec sm" onclick='cdnRename(${i},${JSON.stringify(n.remark || '')})' style="padding:2px 7px" title="переименовать">✏️</button></span>${users}</span>`
+            + `<span class="mut" style="font-size:12.5px">${esc(n.host || '')}${port ? ':' + port : ''} · ${esc((n.protos || []).join(', '))} · ${load}${net}</span>`
+          + `</span>`
+          + `<button class="sw ${n.hidden ? '' : 'on'}" onclick="cdnToggle(${i},${!n.hidden})" title="${n.hidden ? 'скрыт из подписки' : 'показан в подписке'}"></button>`
+          + `</div>`;
+      }).join('')
       + '<div style="height:14px"></div>';
   } catch (e) { box.innerHTML = ''; }
 }

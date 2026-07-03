@@ -133,9 +133,23 @@ async function openUser(id) {
       + '<div class="row" style="margin:0 0 10px"><input id="u_gb" type="number" placeholder="ГБ обхода" style="max-width:130px">'
       + `<button class="btn sm" onclick="bypassGb('${id}',true)">+ докупить</button>`
       + `<button class="btn sec sm" onclick="bypassGb('${id}',false)">− списать</button></div>`
+      + `<div style="margin:6px 0"><button class="btn sec sm" onclick="diagnose('${id}')">🩺 Диагностика</button><span id="diag_${id}" class="mut" style="margin-left:8px"></span></div>`
       + '<b class="mut">Устройства</b><table>' + (devs || '<tr><td class="mut">нет</td></tr>') + '</table>'
       + `<button class="btn sec sm" style="margin-top:8px" onclick="addDevice('${id}')">+ устройство</button></div>`;
   } catch (e) { toast(e.message); }
+}
+async function diagnose(id) {
+  const box = document.getElementById('diag_' + id);
+  box.textContent = 'проверяю…';
+  try {
+    const d = await api('/users/' + id + '/diagnose');
+    const rows = d.checks.map(c => `${c.ok ? '✅' : '❌'} ${esc(c.name)} <span class="mut">(${esc(c.detail)})</span>`).join('<br>');
+    box.innerHTML = '<br>' + rows + '<br><i>' + esc(d.hint) + '</i>' +
+      (d.canFix ? ` <button class="btn sm" onclick="fixUser('${id}')">Починить</button>` : '');
+  } catch (e) { box.textContent = e.message; }
+}
+async function fixUser(id) {
+  try { const r = await api('/users/' + id + '/fix', { method: 'POST' }); toast('Починка: ' + r.reconciled); diagnose(id); } catch (e) { toast(e.message); }
 }
 async function bypassGb(id, add) {
   const gb = parseFloat(document.getElementById('u_gb').value);

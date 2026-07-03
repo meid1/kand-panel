@@ -24,6 +24,7 @@ import { BypassModule } from './bypass/bypass.module';
 import { BotModule } from './bot/bot.module';
 import { CabinetModule } from './cabinet/cabinet.module';
 import { ReferralModule } from './referral/referral.module';
+import { DiagnosticsModule } from './diagnostics/diagnostics.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { ReferralModule } from './referral/referral.module';
     BotModule,
     CabinetModule,
     ReferralModule,
+    DiagnosticsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

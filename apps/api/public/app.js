@@ -134,9 +134,12 @@ RENDER.nodes = async function () {
   try {
     const nodes = await api('/nodes');
     document.getElementById('n_list').innerHTML = nodes.length ? '<table><tr><th>Нода</th><th>Хост</th><th>Протоколы</th><th></th></tr>'
-      + nodes.map((n) => `<tr><td>${esc(n.label)} ${n.isActive ? '<span class="pill ok">вкл</span>' : '<span class="pill bad">выкл</span>'} ${n.online ? '<span class="pill ok">online</span>' : ''}</td>`
+      + nodes.map((n) => `<tr><td>${esc(n.label)} ${n.isActive ? '<span class="pill ok">вкл</span>' : '<span class="pill bad">выкл</span>'} ${n.online ? '<span class="pill ok">online</span>' : '<span class="pill bad">offline</span>'}`
+        + `<div class="mut" style="font-size:11px">${n.lastCheck ? 'проверка: ' + new Date(n.lastCheck).toLocaleString() : 'ещё не проверялась'} <span id="hc_${n.id}"></span></div></td>`
         + `<td class="mut">${esc(n.address)}<br>${esc(n.ip)}</td><td class="mut">${(n.protocols || []).join(', ')}</td>`
-        + `<td class="row"><button class="btn sec sm" onclick="setWarp('${n.id}',${!n.warp})">${n.warp ? '🤖 WARP✓' : '🤖 WARP'}</button>`
+        + `<td class="row"><button class="btn sec sm" onclick="checkNode('${n.id}')">🔄 проверить</button>`
+        + `<button class="btn sec sm" onclick="editNode('${n.id}')">✏️ изменить</button>`
+        + `<button class="btn sec sm" onclick="setWarp('${n.id}',${!n.warp})">${n.warp ? '🤖 WARP✓' : '🤖 WARP'}</button>`
         + `<button class="btn sec sm" onclick="editCfg('${n.id}')">⚙ конфиг</button>`
         + `<button class="btn sec sm" onclick="manualNode('${n.id}')">🔧 ручная</button>`
         + `<button class="btn sec sm" onclick="toggleNode('${n.id}',${!n.isActive})">${n.isActive ? 'выкл' : 'вкл'}</button>`
@@ -145,6 +148,41 @@ RENDER.nodes = async function () {
       : '<span class="mut">пока нет нод</span>';
   } catch (e) { document.getElementById('n_list').textContent = e.message; }
 };
+async function checkNode(id) {
+  const box = document.getElementById('hc_' + id);
+  if (box) box.innerHTML = '<span class="mut">проверяю…</span>';
+  try {
+    const r = await api('/nodes/' + id + '/health');
+    if (box) box.innerHTML = r.online
+      ? `<span style="color:var(--ok)">● online${r.latencyMs != null ? ' · ' + r.latencyMs + ' мс' : ''}</span>`
+      : `<span style="color:var(--bad)">● offline (${esc(r.error || 'нет ответа')})</span>`;
+  } catch (e) { if (box) box.textContent = e.message; }
+}
+async function editNode(id) {
+  try {
+    const n = await api('/nodes/' + id);
+    const box = document.getElementById('n_editor');
+    box.innerHTML = '<div class="card"><b>Изменить ноду</b>'
+      + `<label class="fld">Название</label><input id="e_label" value="${esc(n.label || '')}">`
+      + `<div class="row"><div class="grow"><label class="fld">Хост/домен</label><input id="e_addr" value="${esc(n.address || '')}"></div>`
+      + `<div class="grow"><label class="fld">IP</label><input id="e_ip" value="${esc(n.ip || '')}"></div></div>`
+      + `<div class="row"><div class="grow"><label class="fld">SNI</label><input id="e_sni" value="${esc(n.sni || '')}"></div>`
+      + `<div class="grow"><label class="fld">Порядок</label><input id="e_sort" type="number" value="${n.sortOrder || 0}"></div></div>`
+      + `<div class="row" style="margin-top:10px"><button class="btn" onclick="saveNodeEdit('${id}')">Сохранить</button>`
+      + `<button class="btn sec" onclick="document.getElementById('n_editor').innerHTML=''">Отмена</button></div></div>`;
+    box.scrollIntoView({ behavior: 'smooth' });
+  } catch (e) { toast(e.message); }
+}
+async function saveNodeEdit(id) {
+  const body = {
+    label: document.getElementById('e_label').value.trim(),
+    address: document.getElementById('e_addr').value.trim(),
+    ip: document.getElementById('e_ip').value.trim(),
+    sni: document.getElementById('e_sni').value.trim() || undefined,
+    sortOrder: parseInt(document.getElementById('e_sort').value, 10) || 0,
+  };
+  try { await api('/nodes/' + id, { method: 'PATCH', body: JSON.stringify(body) }); toast('сохранено'); document.getElementById('n_editor').innerHTML = ''; RENDER.nodes(); } catch (e) { toast(e.message); }
+}
 async function editCfg(id) {
   try {
     const cfg = await api('/nodes/' + id + '/config');

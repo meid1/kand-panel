@@ -214,6 +214,21 @@ export class NodesService {
     return { ok: true };
   }
 
+  /** Проверка ноды по кнопке: пинг агента + замер задержки, обновляет online/lastCheck. */
+  async checkHealth(id: string) {
+    const n = await this.prisma.node.findUnique({ where: { id } });
+    if (!n) throw new NotFoundException('нода не найдена');
+    const t0 = Date.now();
+    let online = false; let latencyMs: number | null = null; let error: string | null = null;
+    try {
+      await this.agent.health(n.ip, 8443);
+      online = true; latencyMs = Date.now() - t0;
+    } catch (e: any) { error = e?.message || 'нет ответа от агента'; }
+    const lastCheck = new Date();
+    await this.prisma.node.update({ where: { id }, data: { online, lastCheck } });
+    return { online, latencyMs, lastCheck, error };
+  }
+
   // ── правка конфига установленных нод + ручные материалы ──────────────────
   private decodeBundle(secretKey: string): any {
     try { return JSON.parse(Buffer.from(secretKey, 'base64').toString()); } catch { return {}; }

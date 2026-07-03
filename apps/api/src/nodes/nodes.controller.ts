@@ -27,6 +27,12 @@ export class NodesController {
     return this.nodes.findOne(id);
   }
 
+  // проверить ноду по кнопке (health + задержка)
+  @Get(':id/health')
+  health(@Param('id') id: string) {
+    return this.nodes.checkHealth(id);
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateNodeDto) {
     return this.nodes.update(id, dto);

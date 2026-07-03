@@ -1,5 +1,5 @@
 // Kand admin — vanilla JS, без сборки. Работает на статике, ходит в /api с JWT.
-const APP_VERSION = 'v0.18.1'; // при каждом обновлении бампить + строку в CHANGELOG.md
+const APP_VERSION = 'v0.19.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
 const API = '/api';
 let TOKEN = localStorage.getItem('vp_token') || '';
 // показать версию (шапка + вход)
@@ -167,6 +167,7 @@ RENDER.dashboard = async function () {
   const el = document.getElementById('tab-dashboard');
   el.innerHTML = '<div class="mut">загрузка…</div>';
   try {
+    await api('/sync/light', { method: 'POST' }).catch(() => {}); // догнать свежие оплаты перед показом
     const s = await api('/dashboard/summary');
     const money = (v) => Number(v).toLocaleString('ru-RU') + '₽';
     const h = s.health || {}, f = s.funnel || {};
@@ -232,7 +233,7 @@ async function loadSyncStatus() {
       label = mins <= 0 ? 'только что' : (mins === 1 ? 'минуту назад' : mins + ' мин назад');
     }
     box.insertAdjacentHTML('afterbegin',
-      `<span class="pill ${s.running ? 'warn' : 'ok'}" title="Данные подтягиваются из БД бота каждые 3 мин">🔄 данные: ${s.running ? 'синхронизирую…' : label}</span>`
+      `<span class="pill ${s.running ? 'warn' : 'ok'}" title="Свежие данные из базы бота подтягиваются при каждом открытии страницы (в реальном времени)">🔄 данные: ${s.running ? 'синхронизирую…' : label}</span>`
       + `<button class="btn sec sm" onclick="syncNow(this)" ${s.running ? 'disabled' : ''}>Обновить</button>`);
   } catch (e) { /* нет эндпоинта — норм */ }
 }
@@ -591,6 +592,7 @@ function pageUsers(d) { U_OFFSET = Math.max(0, U_OFFSET + d * U_PAGE); loadUsers
 async function loadUsers() {
   const list = document.getElementById('u_list'); if (!list) return;
   try {
+    await api('/sync/light', { method: 'POST' }).catch(() => {}); // догнать свежие оплаты/продления
     const q = new URLSearchParams({ limit: U_PAGE, offset: U_OFFSET });
     if (U_SEARCH) q.set('search', U_SEARCH);
     if (U_STATUS) q.set('status', U_STATUS);
@@ -645,6 +647,7 @@ async function createManualKey() {
 }
 async function openUser(id) {
   try {
+    await api('/sync/user-by-id/' + id, { method: 'POST' }).catch(() => {}); // моментально свежий клиент из базы бота
     const u = await api('/users/' + id);
     let bp = null; try { bp = await api('/bypass/' + id); } catch (e) { /* нет данных */ }
     const bpLine = bp ? (bp.unlimited ? 'Обход: безлимит'

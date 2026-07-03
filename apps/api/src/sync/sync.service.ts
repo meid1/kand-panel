@@ -62,7 +62,7 @@ export class SyncService implements OnModuleDestroy {
     await this.prisma.setting.upsert({ where: { key }, create: { key, value }, update: { value } });
   }
 
-  @Interval(180_000) // авто каждые 3 минуты
+  @Interval(180_000) // фоновая подметалка (регистрации без оплаты, ручные баны); основной путь — ленивый синк при просмотре
   async tick() {
     if (!this.enabled || this.running) return;
     await this.syncOnce().catch((e) => this.log.warn(`sync tick: ${e.message || e}`));
@@ -122,20 +122,7 @@ export class SyncService implements OnModuleDestroy {
       }
 
       // 4) платежи — инкрементально по id-курсору
-      let cur = Number(await this.getSetting(this.CURSOR_KEY) || '0');
-      if (!cur) {
-        // первичная инициализация: выравниваем курсор на то, что в Kand УЖЕ есть,
-        // чтобы не задублировать исторические платежи (у них нет invoiceId)
-        const kmax = await this.prisma.payment.aggregate({ where: { tenantId }, _max: { paidAt: true } });
-        const [rowsInit] = await db.query(
-          'SELECT COALESCE(MAX(id),0) AS id FROM payments WHERE created_at <= ?',
-          [kmax._max.paidAt || new Date(0)],
-        );
-        cur = Number((rowsInit as any[])[0]?.id || 0);
-        await this.setSetting(this.CURSOR_KEY, String(cur));
-        this.log.log(`sync: инициализирован курсор платежей = ${cur}`);
-      }
-
+      const cur = await this.ensureCursor(db, tenantId);
       const [prows] = await db.query(
         `SELECT p.id, p.user_id, p.amount, p.type, p.status, p.created_at, p.duration_days, u.telegram_id AS tg
          FROM payments p JOIN users u ON u.id = p.user_id
@@ -147,19 +134,7 @@ export class SyncService implements OnModuleDestroy {
         maxId = Math.max(maxId, Number(p.id));
         const k = kByTg.get(String(p.tg));
         if (!k) continue; // юзер не найден (маловероятно после шага 3)
-        const isPaid = this.PAID_TYPES.has(p.type) && p.status === 'SUCCESS' && Number(p.amount) > 0;
-        try {
-          await this.prisma.payment.create({
-            data: {
-              tenantId, userId: k.id, amount: Number(p.amount) || 0,
-              method: p.type || 'unknown', status: isPaid ? 'paid' : 'granted',
-              invoiceId: `catpay_${p.id}`, days: p.duration_days ? Number(p.duration_days) : null,
-              description: p.type || null,
-              createdAt: new Date(p.created_at), paidAt: new Date(p.created_at),
-            },
-          });
-          payments++;
-        } catch (e: any) { this.log.warn(`sync payment ${p.id}: ${e.message || e}`); }
+        if (await this.insertPayment(tenantId, p, k.id)) payments++;
       }
       if (maxId > cur) await this.setSetting(this.CURSOR_KEY, String(maxId));
 
@@ -173,5 +148,133 @@ export class SyncService implements OnModuleDestroy {
     } finally {
       this.running = false;
     }
+  }
+
+  // ── ЛЁГКИЙ СИНК ПО ЗАПРОСУ (для «моментальности» при просмотре) ──────────────
+  /**
+   * Быстрый догон: только НОВЫЕ платежи по курсору + точечное обновление срока/бана
+   * их клиентов (продление = новый платёж → появляется сразу). Дёшев — гоняется
+   * перед показом дашборда/списков, чтобы админ видел свежие данные без ожидания
+   * фонового цикла. Регистрации без оплаты и ручные баны добьёт фоновый syncOnce.
+   */
+  async syncLight() {
+    if (!this.enabled) return { skipped: 'sync выключен' };
+    const tenantId = this.tenantId;
+    let payments = 0, updated = 0;
+    const db = await this.db();
+    const cur = await this.ensureCursor(db, tenantId);
+    const [prows] = await db.query(
+      `SELECT p.id, p.user_id, p.amount, p.type, p.status, p.created_at, p.duration_days, u.telegram_id AS tg,
+              u.is_banned AS ban, (SELECT MAX(s.expired_date) FROM subscriptions s WHERE s.user_id=u.id) AS exp
+       FROM payments p JOIN users u ON u.id = p.user_id
+       WHERE p.id > ? ORDER BY p.id LIMIT 2000`,
+      [cur],
+    );
+    let maxId = cur;
+    for (const p of prows as any[]) {
+      maxId = Math.max(maxId, Number(p.id));
+      const uid = await this.upsertUser(tenantId, String(p.tg), p.exp ? new Date(p.exp) : null, !!p.ban);
+      if (!uid) continue;
+      if (uid.updated) updated++;
+      if (await this.insertPayment(tenantId, p, uid.id)) payments++;
+    }
+    if (maxId > cur) await this.setSetting(this.CURSOR_KEY, String(maxId));
+    if (payments || updated) this.last = { at: new Date().toISOString(), created: 0, updated, payments };
+    return { payments, updated };
+  }
+
+  /**
+   * Точечный синк ОДНОГО клиента по tgId (для открытия карточки): реальный срок/бан
+   * из vpn_db + все его платежи, которых ещё нет в Kand. Всегда мгновенно.
+   */
+  async syncUser(tgId: string | number) {
+    if (!this.enabled) return { skipped: 'sync выключен' };
+    const tenantId = this.tenantId;
+    const tg = String(tgId).replace(/\D/g, '');
+    if (!tg) return { skipped: 'нет tgId' };
+    const db = await this.db();
+    const [urows] = await db.query(
+      `SELECT u.id, u.is_banned AS ban,
+              (SELECT MAX(s.expired_date) FROM subscriptions s WHERE s.user_id=u.id) AS exp
+       FROM users u WHERE u.telegram_id=? LIMIT 1`,
+      [tg],
+    );
+    const u = (urows as any[])[0];
+    if (!u) return { found: false };
+    const up = await this.upsertUser(tenantId, tg, u.exp ? new Date(u.exp) : null, !!u.ban);
+    if (!up) return { found: false };
+    // новые платежи именно этого клиента (дедуп по invoiceId)
+    const [prows] = await db.query(
+      'SELECT id, amount, type, status, created_at, duration_days FROM payments WHERE user_id=? ORDER BY id',
+      [u.id],
+    );
+    let payments = 0;
+    for (const p of prows as any[]) {
+      const exists = await this.prisma.payment.findFirst({ where: { tenantId, invoiceId: `catpay_${p.id}` }, select: { id: true } });
+      if (exists) continue;
+      if (await this.insertPayment(tenantId, { ...p, tg }, up.id)) payments++;
+    }
+    return { found: true, updated: up.updated, payments };
+  }
+
+  /** Точечный синк по внутреннему id клиента Kand (карточка вызывает по id). */
+  async syncUserById(id: string) {
+    if (!this.enabled) return { skipped: 'sync выключен' };
+    const u = await this.prisma.user.findUnique({ where: { id }, select: { tgId: true } });
+    if (!u) return { found: false };
+    return this.syncUser(u.tgId.toString());
+  }
+
+  // ── общие помощники ─────────────────────────────────────────────────────────
+  /** Создаёт клиента, если его нет; иначе обновляет срок/бан при отличии. */
+  private async upsertUser(tenantId: string, tg: string, exp: Date | null, ban: boolean): Promise<{ id: string; updated: boolean } | null> {
+    if (!tg || tg === 'null') return null;
+    try {
+      const k = await this.prisma.user.findFirst({ where: { tenantId, tgId: BigInt(tg) }, select: { id: true, expireAt: true, isBlocked: true } });
+      if (!k) {
+        const nu = await this.prisma.user.create({
+          data: { tenantId, tgId: BigInt(tg), externalId: `cat_${tg}`, expireAt: exp, isBlocked: ban, isTrial: false },
+          select: { id: true },
+        });
+        return { id: nu.id, updated: true };
+      }
+      const diff = (exp?.getTime() || 0) !== (k.expireAt?.getTime() || 0) || ban !== k.isBlocked;
+      if (diff) await this.prisma.user.update({ where: { id: k.id }, data: { expireAt: exp, isBlocked: ban } });
+      return { id: k.id, updated: diff };
+    } catch (e: any) { this.log.warn(`upsertUser tg=${tg}: ${e.message || e}`); return null; }
+  }
+
+  /** Вставка платежа из vpn_db в Kand с дедупом по invoiceId. true если создан. */
+  private async insertPayment(tenantId: string, p: any, userId: string): Promise<boolean> {
+    const isPaid = this.PAID_TYPES.has(p.type) && p.status === 'SUCCESS' && Number(p.amount) > 0;
+    try {
+      await this.prisma.payment.create({
+        data: {
+          tenantId, userId, amount: Number(p.amount) || 0,
+          method: p.type || 'unknown', status: isPaid ? 'paid' : 'granted',
+          invoiceId: `catpay_${p.id}`, days: p.duration_days ? Number(p.duration_days) : null,
+          description: p.type || null,
+          createdAt: new Date(p.created_at), paidAt: new Date(p.created_at),
+        },
+      });
+      return true;
+    } catch (e: any) {
+      // уникальный invoiceId → дубль, это норма при гонке; прочее логируем
+      if (!/Unique|duplicate/i.test(e.message || '')) this.log.warn(`insertPayment ${p.id}: ${e.message || e}`);
+      return false;
+    }
+  }
+
+  /** Курсор платежей: инициализация выравнивает его на то, что в Kand уже есть. */
+  private async ensureCursor(db: any, tenantId: string): Promise<number> {
+    let cur = Number(await this.getSetting(this.CURSOR_KEY) || '0');
+    if (!cur) {
+      const kmax = await this.prisma.payment.aggregate({ where: { tenantId }, _max: { paidAt: true } });
+      const [rowsInit] = await db.query('SELECT COALESCE(MAX(id),0) AS id FROM payments WHERE created_at <= ?', [kmax._max.paidAt || new Date(0)]);
+      cur = Number((rowsInit as any[])[0]?.id || 0);
+      await this.setSetting(this.CURSOR_KEY, String(cur));
+      this.log.log(`sync: инициализирован курсор платежей = ${cur}`);
+    }
+    return cur;
   }
 }

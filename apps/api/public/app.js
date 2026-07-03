@@ -1,5 +1,5 @@
 // Kand admin — vanilla JS, без сборки. Работает на статике, ходит в /api с JWT.
-const APP_VERSION = 'v0.15.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
+const APP_VERSION = 'v0.16.0'; // при каждом обновлении бампить + строку в CHANGELOG.md
 const API = '/api';
 let TOKEN = localStorage.getItem('vp_token') || '';
 // показать версию (шапка + вход)
@@ -265,16 +265,21 @@ async function setPayStatus(id, status) {
 }
 
 // ── ФИНАНСЫ ──────────────────────────────────────────────────────────────────
+let FIN_DAYS = 0; // 0 = всё время
+function setFinDays(d) { FIN_DAYS = d; RENDER.finance(); }
 RENDER.finance = async function () {
   const el = document.getElementById('tab-finance');
   el.innerHTML = '<div class="mut">загрузка…</div>';
   try {
     const money = (v) => Number(v).toLocaleString('ru-RU') + '₽';
-    const s = await api('/finance/summary');
+    const s = await api('/finance/summary' + (FIN_DAYS ? '?days=' + FIN_DAYS : ''));
     const led = await api('/finance/ledger');
     const maxM = Math.max(1, ...s.byMonth.map((m) => m.amount));
+    const per = [[0, 'Всё время'], [30, '30 дней'], [90, '90 дней'], [365, 'Год']];
     el.innerHTML =
-      '<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:12px">'
+      '<div class="phead" style="margin-bottom:12px"><h2>Финансы</h2><div class="sub">доход, расходы и прибыль' + (FIN_DAYS ? ' за выбранный период' : ' за всё время') + '</div></div>'
+      + '<div class="row" style="gap:6px;margin-bottom:12px">' + per.map(([d, t]) => `<button class="qbtn ${FIN_DAYS === d ? 'on' : ''}" onclick="setFinDays(${d})">${t}</button>`).join('') + '</div>'
+      + '<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:12px">'
       + statCard('Доход (платежи)', money(s.revenueTotal), 'реально полученные оплаты')
       + statCard('Внешние доходы', money(s.extraIncome), 'ручной учёт')
       + statCard('Расходы', money(s.expenses), 'сервера, реклама и т.п.')

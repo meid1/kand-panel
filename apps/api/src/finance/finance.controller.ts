@@ -8,8 +8,8 @@ export class FinanceController {
   constructor(private finance: FinanceService) {}
 
   @Get('summary')
-  summary(@Query('tenantId') tenantId?: string) {
-    return this.finance.summary(tenantId);
+  summary(@Query('tenantId') tenantId?: string, @Query('days') days?: string) {
+    return this.finance.summary(tenantId, Number(days) || 0);
   }
 
   @Get('ledger')

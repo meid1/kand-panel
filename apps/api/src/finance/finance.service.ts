@@ -10,9 +10,12 @@ import { PrismaService } from '../prisma/prisma.service';
 export class FinanceService {
   constructor(private prisma: PrismaService) {}
 
-  async summary(tenantId?: string) {
+  async summary(tenantId?: string, days?: number) {
     const T: any = tenantId ? { tenantId } : {};
-    const paid = { ...T, status: 'paid' };
+    // период: если задан days — доход/расход считаем только за окно (иначе за всё время)
+    const winStart = days && days > 0 ? new Date(Date.now() - days * 86400_000) : null;
+    const paid = { ...T, status: 'paid', ...(winStart ? { paidAt: { gte: winStart } } : {}) };
+    const ledgerT: any = { ...T, ...(winStart ? { createdAt: { gte: winStart } } : {}) };
 
     // доход по способам оплаты
     const byMethodRaw = await this.prisma.payment.groupBy({
@@ -37,8 +40,8 @@ export class FinanceService {
 
     const revenueTotal = byMethod.reduce((s, m) => s + m.amount, 0);
     const [exp, inc] = await Promise.all([
-      this.prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { ...T, kind: 'expense' } }),
-      this.prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { ...T, kind: 'income' } }),
+      this.prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { ...ledgerT, kind: 'expense' } }),
+      this.prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { ...ledgerT, kind: 'income' } }),
     ]);
     const expenses = Number(exp._sum.amount || 0);
     const extraIncome = Number(inc._sum.amount || 0);
@@ -46,7 +49,7 @@ export class FinanceService {
     return {
       revenueTotal, expenses, extraIncome,
       profit: revenueTotal + extraIncome - expenses,
-      byMethod, byMonth,
+      byMethod, byMonth, days: days || 0,
     };
   }
 

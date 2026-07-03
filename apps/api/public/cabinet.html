@@ -7,108 +7,127 @@
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{--bg:#030712;--bg2:#060c1c;--card:#0b1220;--cardhi:#111a2b;--line:#1b2740;
-        --accent:#00d4ff;--ok:#34D399;--err:#ff4d6d;--gold:#FBBF24;--txt:#f4f8ff;--mut:#9aa7c2;--dim:#5d6b86}
+        --accent:#00d4ff;--accent2:#7dd3fc;--ok:#34D399;--err:#ff4d6d;--gold:#FBBF24;--txt:#f4f8ff;--mut:#9aa7c2;--dim:#5d6b86}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--txt);font-family:'Manrope',system-ui,sans-serif;
-       letter-spacing:-.01em;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:520px;margin:0 auto;padding:20px 16px 40px}
-  .brand{display:flex;align-items:center;gap:10px;margin:8px 0 20px}
-  .brand .dot{width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:0 0 16px var(--accent)}
-  .brand h1{font-size:20px;font-weight:800;margin:0}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin:0 0 14px}
+  body{margin:0;background:radial-gradient(1200px 600px at 50% -10%, #0a1b2e 0%, var(--bg) 55%);color:var(--txt);
+       font-family:'Manrope',system-ui,sans-serif;letter-spacing:-.01em;-webkit-font-smoothing:antialiased;min-height:100vh}
+  .wrap{max-width:540px;margin:0 auto;padding:22px 16px 48px}
+  .brand{display:flex;align-items:center;gap:11px;margin:6px 0 22px}
+  .brand .dot{width:14px;height:14px;border-radius:50%;background:var(--accent);box-shadow:0 0 22px var(--accent)}
+  .brand h1{font-size:21px;font-weight:800;margin:0}
+  .card{background:linear-gradient(180deg,var(--cardhi),var(--card));border:1px solid var(--line);border-radius:20px;padding:18px;margin:0 0 14px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
   .status{display:flex;align-items:center;justify-content:space-between}
-  .big{font-size:30px;font-weight:800;line-height:1.1}
-  .sub{color:var(--mut);font-size:13px;margin-top:4px}
-  .badge{font-size:12px;font-weight:700;padding:5px 11px;border-radius:20px}
-  .badge.ok{background:rgba(52,211,153,.14);color:var(--ok)}
-  .badge.err{background:rgba(255,77,109,.14);color:var(--err)}
-  .bar{height:9px;border-radius:6px;background:#0c1526;overflow:hidden;margin:10px 0 6px}
-  .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#7dd3fc)}
-  .lbl{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-bottom:8px}
-  .dev{display:flex;align-items:center;gap:10px;padding:11px 0;border-top:1px solid var(--line)}
-  .dev:first-of-type{border-top:0}
-  .dev .nm{font-weight:600;flex:1}
-  .btn{background:var(--accent);color:#00131a;border:0;font-weight:700;padding:11px 15px;border-radius:12px;
-       font:inherit;font-weight:700;cursor:pointer}
-  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--txt);font-weight:600}
-  .btn.sm{padding:7px 11px;font-size:13px}
-  .btn.block{display:block;width:100%;text-align:center;margin-top:6px}
+  .big{font-size:34px;font-weight:800;line-height:1.05;background:linear-gradient(90deg,#fff,var(--accent2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .sub{color:var(--mut);font-size:13px;margin-top:5px}
+  .badge{font-size:12px;font-weight:700;padding:6px 12px;border-radius:20px}
+  .badge.ok{background:rgba(52,211,153,.14);color:var(--ok)} .badge.err{background:rgba(255,77,109,.14);color:var(--err)}
+  .bar{height:10px;border-radius:6px;background:#0c1526;overflow:hidden;margin:10px 0 6px}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .lbl{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;margin-bottom:10px}
+  .dev{border-top:1px solid var(--line);padding-top:14px;margin-top:14px}
+  .dev:first-of-type{border-top:0;margin-top:0;padding-top:0}
+  .dev .nm{font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .apps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .appbtn{display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;background:#0e1a2c;border:1px solid var(--line);
+          color:var(--txt);font-weight:700;font-size:13px;padding:11px 6px;border-radius:13px;transition:.15s}
+  .appbtn:hover{border-color:var(--accent);background:#12233a}
+  .appbtn.primary{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#00131a;border:0}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .btn{background:#182339;border:1px solid var(--line);color:var(--txt);font-weight:600;padding:9px 13px;border-radius:12px;font:inherit;font-weight:600;cursor:pointer}
+  .btn.sm{padding:7px 11px;font-size:13px} .btn.acc{background:var(--accent);color:#00131a;border:0;font-weight:700}
+  .btn.block{display:block;width:100%;text-align:center}
+  .hint{background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.18);border-radius:13px;padding:10px 12px;font-size:13px;color:var(--mut);margin-top:6px}
   .pays{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-  a.btn{text-decoration:none;display:inline-block}
-  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#0c1119;border:1px solid var(--line);
-         padding:10px 16px;border-radius:12px}
+  .guide-step{display:flex;gap:11px;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
+  .guide-step:first-child{border-top:0}
+  .guide-step .n{flex:none;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#00131a;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px}
   .mut{color:var(--mut)} .center{text-align:center}
-  .skeleton{opacity:.5}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#0c1119;border:1px solid var(--line);padding:11px 17px;border-radius:12px}
+  .foldbtn{cursor:pointer;user-select:none}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="brand"><span class="dot"></span><h1 id="brand">Кабинет</h1></div>
-  <div id="app" class="skeleton"><div class="card center mut">Загрузка…</div></div>
+  <div id="app"><div class="card center mut">Загрузка…</div></div>
 </div>
 <script>
 const token = location.pathname.split('/')[2] || '';
 const $ = (id) => document.getElementById(id);
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2200);}
 function copy(s){navigator.clipboard?.writeText(s).then(()=>toast('Скопировано'),()=>toast(s));}
-function toggleQr(i){const el=document.getElementById('qr'+i);if(el)el.style.display=el.style.display==='none'?'block':'none';}
-function toggleTv(i){const el=document.getElementById('tv'+i);if(el)el.style.display=el.style.display==='none'?'block':'none';}
+function fold(id){const el=$(id);if(el)el.style.display=el.style.display==='none'?'block':'none';}
 const esc=(s)=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const enc=encodeURIComponent;
+
+// приложения и их deep-link импорта подписки (открывают приложение и добавляют ссылку сами)
+const APPS=[
+  {n:'Happ',      u:(s)=>`happ://add/${enc(s)}`},
+  {n:'v2rayNG',   u:(s)=>`v2rayng://install-sub?url=${enc(s)}`},
+  {n:'Streisand', u:(s)=>`streisand://import/${enc(s)}`},
+  {n:'Hiddify',   u:(s)=>`hiddify://import/${enc(s)}`},
+  {n:'NekoBox',   u:(s)=>`sn://subscription?url=${enc(s)}`},
+  {n:'Clash',     u:(s)=>`clash://install-config?url=${enc(s)}`},
+];
 
 async function load(){
   let d;
   try{ const r=await fetch(`/api/cabinet/${token}/data`); if(!r.ok) throw 0; d=await r.json(); }
-  catch{ $('app').innerHTML='<div class="card center err">Кабинет не найден или ссылка устарела.</div>'; return; }
+  catch{ $('app').innerHTML='<div class="card center" style="color:var(--err)">Кабинет не найден или ссылка устарела.</div>'; return; }
   document.documentElement.style.setProperty('--accent', d.accent||'#00d4ff');
   $('brand').textContent = d.brand||'Кабинет';
   document.title = (d.brand||'Кабинет')+' — личный кабинет';
 
-  const bp = d.bypass||{};
-  const usedPct = (!bp.unlimited && bp.capGb) ? Math.min(100, Math.round((bp.usedGb/bp.capGb)*100)) : 0;
-  const bypassBlock = bp.unlimited
-    ? `<div class="lbl">Обход белых списков</div><div>Безлимит</div>`
-    : `<div class="lbl">Обход белых списков ${bp.suspended?'<span class="badge err" style="margin-left:6px">исчерпан</span>':''}</div>
-       <div class="bar"><i style="width:${usedPct}%"></i></div>
-       <div class="sub">${(bp.remainingGb??0).toFixed(1)} ГБ осталось из ${(bp.capGb??0).toFixed(1)}</div>`;
+  const bp=d.bypass||{};
+  const usedPct=(!bp.unlimited&&bp.capGb)?Math.min(100,Math.round((bp.usedGb/bp.capGb)*100)):0;
+  const bypassBlock=bp.unlimited
+    ?`<div class="lbl">Обход белых списков</div><div>Безлимит</div>`
+    :`<div class="lbl">Обход белых списков ${bp.suspended?'<span class="badge err" style="margin-left:6px">исчерпан</span>':''}</div>
+      <div class="bar"><i style="width:${usedPct}%"></i></div>
+      <div class="sub">${(bp.remainingGb??0).toFixed(1)} ГБ осталось из ${(bp.capGb??0).toFixed(1)}</div>`;
 
-  const devs = (d.devices||[]).map((dev,i)=>`
-    <div class="dev">
-      <div class="nm">${esc(dev.name)}</div>
-      <button class="btn ghost sm" onclick="copy('${esc(dev.sub)}')">Ссылка</button>
-      <button class="btn sm" onclick="copy('${esc(dev.smart)}')">Умная</button>
-      <button class="btn ghost sm" onclick="toggleQr(${i})">QR</button>
-      ${dev.tv?`<button class="btn ghost sm" onclick="toggleTv(${i})">📺 ТВ</button>`:''}
-    </div>
-    <div id="qr${i}" style="display:none;text-align:center;padding:10px 0">
-      <img src="/api/cabinet/${token}/qr/${i}" width="200" height="200" style="background:#fff;border-radius:12px;padding:8px"/>
-      <div class="mut" style="font-size:12px;margin-top:6px">Отсканируйте в приложении</div>
-    </div>
-    ${dev.tv?`<div id="tv${i}" style="display:none;padding:10px 0">
-      <div class="mut" style="font-size:12px;margin-bottom:6px">На телевизоре (Android TV): установите v2rayNG/Hiddify, добавьте подписку по короткому адресу или коду:</div>
-      <div style="text-align:center;font-size:22px;font-weight:800;letter-spacing:2px">${esc(dev.tvCode)}</div>
-      <div class="mut" style="text-align:center;font-size:13px;margin-top:4px">${esc(dev.tv)}</div>
-      <button class="btn ghost sm block" onclick="copy('${esc(dev.tv)}')">Скопировать ТВ-ссылку</button>
-    </div>`:''}`).join('') || '<div class="mut center">нет устройств</div>';
+  const devs=(d.devices||[]).map((dev,i)=>{
+    const appBtns=APPS.map(a=>`<a class="appbtn${a.n==='Happ'?' primary':''}" href="${a.u(dev.smart)}">${a.n}</a>`).join('');
+    return `<div class="dev">
+      <div class="nm">📱 ${esc(dev.name)}</div>
+      <div class="apps">${appBtns}</div>
+      <div class="row">
+        <button class="btn sm" onclick="copy('${esc(dev.smart)}')">🔗 Скопировать ссылку</button>
+        <button class="btn sm" onclick="fold('qr${i}')">QR-код</button>
+        ${dev.tv?`<button class="btn sm" onclick="fold('tv${i}')">📺 Телевизор</button>`:''}
+      </div>
+      <div id="qr${i}" style="display:none;text-align:center;padding:12px 0">
+        <img src="/api/cabinet/${token}/qr/${i}" width="210" height="210" style="background:#fff;border-radius:14px;padding:8px"/>
+        <div class="mut" style="font-size:12px;margin-top:6px">Отсканируйте в приложении</div>
+      </div>
+      ${dev.tv?`<div id="tv${i}" style="display:none;padding:12px 0" class="hint">
+        📺 На телевизоре (Android TV): установите Happ или v2rayNG, добавьте подписку по короткому адресу или коду:
+        <div class="center" style="font-size:24px;font-weight:800;letter-spacing:3px;color:var(--txt);margin:8px 0">${esc(dev.tvCode||'')}</div>
+        <div class="center mut" style="font-size:13px">${esc(dev.tv)}</div>
+        <button class="btn sm block acc" style="margin-top:8px" onclick="copy('${esc(dev.tv)}')">Скопировать ТВ-ссылку</button>
+      </div>`:''}
+    </div>`;
+  }).join('') || '<div class="mut center">нет устройств</div>';
 
-  const pays = (d.payMethods||[]).map(m=>`<button class="btn ghost" onclick="buy('${m.id}')">${esc(m.title)}</button>`).join('')
-    || '<div class="mut center" style="grid-column:1/3">оплата недоступна</div>';
+  const pays=(d.payMethods||[]).map(m=>`<button class="btn acc" onclick="buy('${m.id}')">${esc(m.title)}</button>`).join('')
+    ||'<div class="mut center" style="grid-column:1/3">оплата недоступна</div>';
 
-  $('app').className='';
-  $('app').innerHTML = `
+  $('app').innerHTML=`
     <div class="card">
       <div class="status">
         <div>
-          <div class="big">${d.active ? (d.daysLeft!=null? d.daysLeft+' дн.' : 'Активна') : 'Неактивна'}</div>
-          <div class="sub">${d.expireAt ? 'до '+new Date(d.expireAt).toLocaleDateString('ru-RU') : 'подписка'}</div>
+          <div class="big">${d.active?(d.daysLeft!=null?d.daysLeft+' дн.':'Активна'):'Неактивна'}</div>
+          <div class="sub">${d.expireAt?'подписка до '+new Date(d.expireAt).toLocaleDateString('ru-RU'):'подписка'}</div>
         </div>
         <span class="badge ${d.active?'ok':'err'}">${d.active?'активна':'истекла'}</span>
       </div>
-      <div style="margin-top:14px">${bypassBlock}</div>
+      <div style="margin-top:16px">${bypassBlock}</div>
     </div>
 
     <div class="card">
       <div class="lbl">Мои устройства</div>
       ${devs}
+      <div class="hint" style="margin-top:14px">💡 <b>Умная</b> подписка — рекомендуется: российские сайты идут напрямую, YouTube без рекламы, остальное через VPN. Кнопки приложений добавляют именно её.</div>
     </div>
 
     <div class="card">
@@ -116,8 +135,15 @@ async function load(){
       <div class="pays">${pays}</div>
     </div>
 
-    <div class="center mut" style="font-size:12px;margin-top:8px">
-      Вставьте ссылку в приложение: v2rayNG · Streisand · Hiddify
+    <div class="card">
+      <div class="lbl foldbtn" onclick="fold('guide')">📖 Как подключить &nbsp;<span class="mut" style="font-size:12px">(нажмите)</span></div>
+      <div id="guide" style="display:none">
+        <div class="guide-step"><span class="n">1</span><div>Установите приложение: <b>Happ</b> (проще всего), v2rayNG, Streisand или Hiddify — из App Store / Google Play.</div></div>
+        <div class="guide-step"><span class="n">2</span><div>Нажмите кнопку вашего приложения выше — подписка добавится <b>автоматически</b> в один тап.</div></div>
+        <div class="guide-step"><span class="n">3</span><div>Если не сработало — «Скопировать ссылку» и вставьте в приложении вручную.</div></div>
+        <div class="guide-step"><span class="n">4</span><div>Выберите сервер и включите VPN. Готово 🎉</div></div>
+        <div class="guide-step"><span class="n">📺</span><div>Телевизор: приложение из Google Play → добавить подписку по короткому ТВ-адресу (кнопка «Телевизор»).</div></div>
+      </div>
     </div>`;
 }
 async function buy(provider){

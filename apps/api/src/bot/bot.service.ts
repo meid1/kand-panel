@@ -121,12 +121,18 @@ export class BotService implements OnModuleInit {
 
   private async menu(): Promise<InlineButton[][]> {
     const b = async (key: string, data: string) => ({ text: await this.settings.getText(key), callback_data: data });
-    return [
+    const rows: InlineButton[][] = [
       [await b('btn.connect', 'connect')],
       [await b('btn.account', 'account'), await b('btn.buy', 'buy')],
       [await b('btn.trial', 'trial'), await b('btn.referral', 'referral')],
       [await b('btn.support', 'support')],
     ];
+    // кастомные кнопки (создаёт админ): url → ссылка, text → показать текст
+    const custom = await this.settings.getButtons();
+    custom.forEach((c: any, i: number) => {
+      rows.push([c.action === 'url' ? { text: c.text, url: c.value } : { text: c.text, callback_data: `cbx:${i}` }]);
+    });
+    return rows;
   }
 
   private panelUrl(): string {
@@ -240,6 +246,11 @@ export class BotService implements OnModuleInit {
     if (data.startsWith('pay:')) { const [, planId, provider] = data.split(':'); return this.createInvoice(chatId, user, provider, planId); }
     if (data.startsWith('buy:')) return this.createInvoice(chatId, user, data.slice(4));
     if (data === 'referral') return this.sendReferral(chatId, user);
+    // кастомная кнопка с действием «показать текст»
+    if (data.startsWith('cbx:')) {
+      const c = (await this.settings.getButtons())[+data.slice(4)];
+      if (c && c.action === 'text') return tg.sendMessage(this.token, chatId, await this.subst(c.value), await this.menu());
+    }
   }
 
   private async sendReferral(chatId: number, user: any) {

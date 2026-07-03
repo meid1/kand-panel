@@ -183,9 +183,26 @@ RENDER.texts = async function () {
           + `${t.premium ? ' <span class="pill">возможна премиум-версия через бота</span>' : ''}</label>${field}`
           + `<div class="row"><button class="btn sm" onclick="saveText('${esc(t.key)}')">Сохранить</button>`
           + `<button class="btn sec sm" onclick="resetText('${esc(t.key)}')">Сбросить к дефолту</button></div></div>`;
-      }).join('') + '</div>';
+      }).join('') + '</div>'
+      + '<div class="card" id="btns_card"><b>Кнопки бота (свои)</b><div class="mut">Добавь свою кнопку: ссылку или показ текста. Появится в меню бота.</div><div id="btns_list"></div>'
+      + '<div class="row" style="margin-top:8px"><input id="cb_text" placeholder="Текст кнопки" class="grow"><select id="cb_action"><option value="url">Ссылка</option><option value="text">Показать текст</option></select></div>'
+      + '<input id="cb_value" placeholder="URL или текст сообщения"><div style="margin-top:6px"><button class="btn sm" onclick="addBtn()">Добавить кнопку</button></div></div>';
+    renderBtns();
   } catch (e) { el.innerHTML = '<div class="card">' + esc(e.message) + '</div>'; }
 };
+let BTNS = [];
+async function renderBtns() {
+  try { BTNS = await api('/settings/buttons'); } catch { BTNS = []; }
+  const box = document.getElementById('btns_list'); if (!box) return;
+  box.innerHTML = BTNS.length ? BTNS.map((b, i) => `<div class="row" style="border-top:1px solid var(--line);padding-top:8px;margin-top:8px"><div class="grow">${esc(b.text)} <span class="pill">${b.action === 'url' ? 'ссылка' : 'текст'}</span> <span class="mut">${esc((b.value || '').slice(0, 40))}</span></div><button class="btn bad sm" onclick="delBtn(${i})">×</button></div>`).join('') : '<div class="mut">пока нет своих кнопок</div>';
+}
+async function addBtn() {
+  const b = { text: document.getElementById('cb_text').value.trim(), action: document.getElementById('cb_action').value, value: document.getElementById('cb_value').value.trim() };
+  if (!b.text || !b.value) return toast('заполни текст и значение');
+  BTNS.push(b);
+  try { await api('/settings/buttons', { method: 'PUT', body: JSON.stringify({ buttons: BTNS }) }); toast('кнопка добавлена'); document.getElementById('cb_text').value = ''; document.getElementById('cb_value').value = ''; renderBtns(); } catch (e) { toast(e.message); }
+}
+async function delBtn(i) { BTNS.splice(i, 1); try { await api('/settings/buttons', { method: 'PUT', body: JSON.stringify({ buttons: BTNS }) }); renderBtns(); } catch (e) { toast(e.message); } }
 async function saveText(key) {
   const val = document.getElementById('t_' + key).value;
   try { await api('/settings/texts/' + encodeURIComponent(key), { method: 'PUT', body: JSON.stringify({ value: val }) }); toast('сохранено'); RENDER.texts(); } catch (e) { toast(e.message); }

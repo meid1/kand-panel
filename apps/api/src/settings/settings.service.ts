@@ -110,6 +110,18 @@ export class SettingsService {
     return { ok: true };
   }
 
+  /** Кастомные кнопки бота (создаёт админ): [{text, action:url|text|builtin, value}]. */
+  async getButtons(): Promise<any[]> {
+    const raw = await this.raw('bot.buttons');
+    try { return raw ? JSON.parse(raw) : []; } catch { return []; }
+  }
+  async setButtons(buttons: any[]) {
+    const clean = (Array.isArray(buttons) ? buttons : []).filter((b) => b && b.text && ['url', 'text'].includes(b.action) && b.value)
+      .slice(0, 20).map((b) => ({ text: String(b.text).slice(0, 64), action: String(b.action), value: String(b.value || '').slice(0, 500) }));
+    await this.put('bot.buttons', JSON.stringify(clean));
+    return { ok: true, buttons: clean };
+  }
+
   async setBrand(brand: string, support?: string) {
     if (brand) await this.put('brand', brand);
     if (support) await this.put('support', support);

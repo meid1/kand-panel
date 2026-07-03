@@ -42,4 +42,11 @@ export class SettingsController {
   setFlag(@Param('key') key: string, @Body('value') value: string) {
     return this.settings.setFlag(key, value);
   }
+
+  // кастомные кнопки бота
+  @Get('buttons')
+  getButtons() { return this.settings.getButtons(); }
+
+  @Put('buttons')
+  setButtons(@Body('buttons') buttons: any[]) { return this.settings.setButtons(buttons); }
 }

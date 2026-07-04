@@ -4,12 +4,13 @@ import { UsersModule } from '../users/users.module';
 import { ReferralModule } from '../referral/referral.module';
 import { PlansModule } from '../plans/plans.module';
 import { PromoGroupsModule } from '../promo-groups/promo-groups.module';
+import { CampaignsModule } from '../campaigns/campaigns.module';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { ProviderRegistry } from './providers/provider.registry';
 
 @Module({
-  imports: [AuthModule, UsersModule, ReferralModule, PlansModule, PromoGroupsModule], // дни + реф-бонус + тарифы + скидки групп
+  imports: [AuthModule, UsersModule, ReferralModule, PlansModule, PromoGroupsModule, CampaignsModule], // дни + реф-бонус + тарифы + скидки + postback
   controllers: [PaymentsController],
   providers: [PaymentsService, ProviderRegistry],
   exports: [PaymentsService],

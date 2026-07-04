@@ -56,6 +56,7 @@ model User {
   promoGroup   PromoGroup? @relation(fields: [promoGroupId], references: [id])
   campaignId   String?  // UTM-кампания, приведшая клиента
   campaign     Campaign? @relation(fields: [campaignId], references: [id])
+  campaignSubId String? // sub_id партнёра (click id) для S2S-postback
   createdAt    DateTime @default(now())
   devices      Device[]
   payments     Payment[]
@@ -110,11 +111,12 @@ model SavedCard {
 model Campaign {
   id        String   @id @default(cuid())
   tenantId  String?
-  name      String
-  code      String   @unique // метка в ссылке /c/<code> и в ?start=c_<code>
-  clicks    Int      @default(0)
-  createdAt DateTime @default(now())
-  users     User[]
+  name        String
+  code        String   @unique // метка в ссылке /c/<code> и в ?start=c_<code>
+  clicks      Int      @default(0)
+  postbackUrl String?  // S2S-postback партнёру (макросы {event} {sub_id} {payout} {code})
+  createdAt   DateTime @default(now())
+  users       User[]
 }
 
 /// Тикеты поддержки: обращения клиента (из бота/кабинета) и ответы админа.

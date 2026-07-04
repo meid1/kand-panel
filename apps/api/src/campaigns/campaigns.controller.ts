@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CampaignsService } from './campaigns.service';
@@ -17,8 +17,8 @@ export class CampaignsController {
 export class CampaignClickController {
   constructor(private campaigns: CampaignsService) {}
   @Get(':code')
-  async click(@Param('code') code: string, @Res() res: Response) {
-    const url = await this.campaigns.trackClick(code);
+  async click(@Param('code') code: string, @Query('sub') sub: string, @Res() res: Response) {
+    const url = await this.campaigns.trackClick(code, sub);
     res.redirect(302, url || process.env.PANEL_URL || '/');
   }
 }

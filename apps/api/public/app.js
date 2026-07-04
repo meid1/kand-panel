@@ -1060,6 +1060,9 @@ RENDER.campaigns = async function () {
   el.innerHTML = '<div class="card"><b>Новая кампания</b>'
     + '<div class="mut">Метка для отслеживания воронки: клик по ссылке → регистрация в боте → оплата. Раздавайте ссылку в рекламе (VK, каналы, блогеры).</div>'
     + '<div class="row" style="margin-top:8px"><input id="cm_name" placeholder="Название (Реклама VK)" class="grow"><input id="cm_code" placeholder="метка VK1 (латиница)" style="max-width:170px"></div>'
+    + '<label class="fld" style="margin-top:8px">S2S-postback URL партнёра <span class="mut">(необязательно)</span></label>'
+    + '<input id="cm_pb" placeholder="https://partner.com/pb?clickid={sub_id}&event={event}&sum={payout}">'
+    + '<div class="mut" style="font-size:11px;margin-top:4px">Макросы: <code>{event}</code> (reg/sale), <code>{sub_id}</code> (click id из ссылки <code>/c/КОД?sub=XXX</code>), <code>{payout}</code> (сумма оплаты), <code>{code}</code>. Дёргается при регистрации и оплате привязанного клиента.</div>'
     + '<div style="margin-top:8px"><button class="btn" onclick="addCampaign()">Создать</button></div></div>'
     + '<div class="card"><b>Кампании</b><div id="cm_list" class="mut">загрузка…</div></div>';
   try {
@@ -1070,7 +1073,7 @@ RENDER.campaigns = async function () {
       + list.map((c) => {
         const cr = c.regs ? Math.round((c.paid / c.regs) * 100) : 0;
         const linkUrl = location.origin + '/c/' + c.code;
-        return `<tr><td><b>${esc(c.name)}</b> <span class="mut">${esc(c.code)}</span></td>`
+        return `<tr><td><b>${esc(c.name)}</b> <span class="mut">${esc(c.code)}</span>${c.postbackUrl ? ' <span class="pill">S2S</span>' : ''}</td>`
           + `<td>${c.link ? `<button class="btn sec sm" onclick='copyText(${JSON.stringify(linkUrl)})'>📋 ссылка</button>` : '<span class="mut">—</span>'}</td>`
           + `<td class="mut">${c.clicks}</td><td class="mut">${c.regs}</td><td class="mut">${c.paid} <span class="mut">(${cr}%)</span></td><td>${Number(c.revenue).toLocaleString('ru-RU')}₽</td>`
           + `<td><button class="btn bad sm" onclick='delCampaign(${JSON.stringify(c.id)})'>×</button></td></tr>`;
@@ -1079,7 +1082,7 @@ RENDER.campaigns = async function () {
   } catch (e) { document.getElementById('cm_list').textContent = e.message; }
 };
 async function addCampaign() {
-  const body = { name: document.getElementById('cm_name').value.trim(), code: document.getElementById('cm_code').value.trim() };
+  const body = { name: document.getElementById('cm_name').value.trim(), code: document.getElementById('cm_code').value.trim(), postbackUrl: document.getElementById('cm_pb').value.trim() };
   if (!body.name) return toast('укажи название');
   try { await api('/campaigns', { method: 'POST', body: JSON.stringify(body) }); toast('кампания создана'); RENDER.campaigns(); } catch (e) { toast(e.message); }
 }

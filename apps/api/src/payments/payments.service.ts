@@ -6,6 +6,7 @@ import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { ReferralService } from '../referral/referral.service';
 import { PlansService } from '../plans/plans.service';
 import { PromoGroupsService } from '../promo-groups/promo-groups.service';
+import { CampaignsService } from '../campaigns/campaigns.service';
 
 /**
  * Оркестрация оплаты поверх реестра провайдеров. Единый путь:
@@ -23,6 +24,7 @@ export class PaymentsService {
     private referral: ReferralService,
     private plans: PlansService,
     private promoGroups: PromoGroupsService,
+    private campaigns: CampaignsService,
   ) {}
 
   async createInvoice(dto: CreateInvoiceDto) {
@@ -122,6 +124,7 @@ export class PaymentsService {
       }
       if (payment.days) await this.users.grantDays(payment.userId, payment.days);
       await this.referral.rewardOnFirstPayment(payment.userId); // реф-бонус за 1-ю оплату
+      this.campaigns.onPayment(payment.userId, Number(payment.amount)).catch(() => {}); // S2S sale postback
       this.log.log(`оплата ${payment.id} (${providerId}) → +${payment.days} дн.`);
       return { ok: true, granted: payment.days };
     }
@@ -156,6 +159,7 @@ export class PaymentsService {
       throw e;
     }
     await this.referral.rewardOnFirstPayment(userId);
+    this.campaigns.onPayment(userId, price).catch(() => {}); // S2S sale postback
     const fresh = await this.prisma.user.findUnique({ where: { id: userId }, select: { balance: true } });
     return { ok: true, days: plan.days, balance: Number(fresh?.balance ?? 0) };
   }
@@ -264,6 +268,7 @@ export class PaymentsService {
     if (flip.count === 0) return { ok: true, days: payment.days };
     if (payment.days) await this.users.grantDays(payment.userId, payment.days);
     await this.referral.rewardOnFirstPayment(payment.userId);
+    this.campaigns.onPayment(payment.userId, Number(payment.amount)).catch(() => {}); // S2S sale postback
     this.log.log(`оплата ${payment.id} (stars) → +${payment.days} дн.`);
     return { ok: true, days: payment.days };
   }
@@ -312,6 +317,7 @@ export class PaymentsService {
       await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'paid', paidAt: new Date(), invoiceId: r.externalId } });
       await this.users.grantDays(userId, plan.days);
       await this.referral.rewardOnFirstPayment(userId);
+      this.campaigns.onPayment(userId, price).catch(() => {}); // S2S sale postback
       this.log.log(`автосписание с карты: user ${userId} → +${plan.days} дн. (${price}₽)`);
       return { ok: true, days: plan.days };
     } catch (e: any) {

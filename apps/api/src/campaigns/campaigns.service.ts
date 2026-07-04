@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -9,9 +9,25 @@ import { PrismaService } from '../prisma/prisma.service';
  */
 @Injectable()
 export class CampaignsService {
+  private readonly log = new Logger(CampaignsService.name);
   constructor(private prisma: PrismaService) {}
 
   private norm(code: string) { return String(code || '').trim().toUpperCase().replace(/[^A-Z0-9_]/g, ''); }
+  private normSub(s: string) { return String(s || '').trim().replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64); }
+
+  /** S2S-postback партнёру (fire-and-forget). Макросы: {event} {sub_id} {payout} {code}. */
+  private firePostback(campaign: any, event: string, subId?: string | null, payout?: number) {
+    if (!campaign?.postbackUrl) return;
+    try {
+      const url = String(campaign.postbackUrl)
+        .replace(/\{event\}/g, event)
+        .replace(/\{sub_id\}/g, encodeURIComponent(subId || ''))
+        .replace(/\{payout\}/g, String(payout ?? ''))
+        .replace(/\{code\}/g, encodeURIComponent(campaign.code));
+      fetch(url, { signal: AbortSignal.timeout(8000) }).then(() => {}).catch(() => {});
+      this.log.log(`postback ${event} → ${campaign.code}`);
+    } catch { /* невалидный url — игнор */ }
+  }
 
   async botUsername(): Promise<string | null> {
     const s = await this.prisma.setting.findUnique({ where: { key: 'bot.username' } });
@@ -24,7 +40,7 @@ export class CampaignsService {
     const code = this.norm(dto?.code) || this.norm(name).slice(0, 12);
     if (!code) throw new BadRequestException('нужен код кампании (латиница/цифры)');
     if (await this.prisma.campaign.findUnique({ where: { code } })) throw new BadRequestException('такой код уже есть');
-    return this.prisma.campaign.create({ data: { name, code, tenantId: dto?.tenantId || null } });
+    return this.prisma.campaign.create({ data: { name, code, tenantId: dto?.tenantId || null, postbackUrl: dto?.postbackUrl?.trim() || null } });
   }
 
   async list() {
@@ -52,23 +68,36 @@ export class CampaignsService {
     return { ok: true };
   }
 
-  /** Клик по ссылке /c/:code → +1 клик; вернуть deep-link в бота (или null). */
-  async trackClick(codeRaw: string): Promise<string | null> {
+  /** Клик по ссылке /c/:code?sub=<clickid> → +1 клик; deep-link в бота (sub пробрасываем). */
+  async trackClick(codeRaw: string, sub?: string): Promise<string | null> {
     const code = this.norm(codeRaw);
     if (!code) return null;
     const c = await this.prisma.campaign.findUnique({ where: { code } });
     if (!c) return null;
     await this.prisma.campaign.update({ where: { id: c.id }, data: { clicks: { increment: 1 } } });
     const username = await this.botUsername();
-    return username ? `https://t.me/${username}?start=c_${c.code}` : null;
+    if (!username) return null;
+    const s = this.normSub(sub || '');
+    return `https://t.me/${username}?start=c_${c.code}${s ? '__' + s : ''}`;
   }
 
-  /** Привязать кампанию к клиенту (первый /start c_<code>, только если ещё не привязан). */
-  async attribute(userId: string, codeRaw: string) {
+  /** Привязать кампанию к клиенту (первый /start c_<code>[__<sub>]). Фиксируем sub_id + postback reg. */
+  async attribute(userId: string, raw: string) {
+    const [codeRaw, sub] = String(raw || '').split('__');
     const code = this.norm(codeRaw);
     if (!code) return;
     const c = await this.prisma.campaign.findUnique({ where: { code } });
     if (!c) return;
-    await this.prisma.user.updateMany({ where: { id: userId, campaignId: null }, data: { campaignId: c.id } });
+    const subId = this.normSub(sub || '') || null;
+    const res = await this.prisma.user.updateMany({ where: { id: userId, campaignId: null }, data: { campaignId: c.id, campaignSubId: subId } });
+    if (res.count > 0) this.firePostback(c, 'reg', subId, 0); // новая регистрация по метке
+  }
+
+  /** Оплата привязанного к кампании клиента → S2S-postback event=sale (payout=сумма). */
+  async onPayment(userId: string, amount: number) {
+    const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { campaignId: true, campaignSubId: true } });
+    if (!u?.campaignId) return;
+    const c = await this.prisma.campaign.findUnique({ where: { id: u.campaignId } });
+    if (c?.postbackUrl) this.firePostback(c, 'sale', u.campaignSubId, amount);
   }
 }

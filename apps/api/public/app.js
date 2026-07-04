@@ -237,8 +237,38 @@ RENDER.dashboard = async function () {
       }
     } catch (e) { /* моста нет — норм */ }
     loadSyncStatus();
+    renderOnboarding(el);
   } catch (e) { el.innerHTML = '<div class="mut">' + esc(e.message) + '</div>'; }
 };
+// Мастер первой настройки: карточка «Быстрый старт» сверху, пока не пройдены 5 шагов
+async function renderOnboarding(el) {
+  if (localStorage.getItem('kand_onb_hidden')) return;
+  let o; try { o = await api('/onboarding'); } catch (e) { return; }
+  if (!o || o.complete) return;
+  const STEPS = [
+    ['servers', 'Добавьте первый сервер', 'Подключите ноду одной командой', 'nodes'],
+    ['payments', 'Подключите платёжку', 'ЮKassa, крипта, Telegram Stars и др.', 'payments'],
+    ['bot', 'Настройте Telegram-бота', 'Впишите токен бота — клиенты пойдут через него', 'texts'],
+    ['plans', 'Задайте тарифы', 'Сроки и цены подписок', 'plans'],
+    ['brand', 'Оформите бренд', 'Название и цвет вашего сервиса', 'brand'],
+  ];
+  const chk = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ok)"><path d="M4 12l5 5L20 6"/></svg>';
+  const dot = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--mut)"><circle cx="12" cy="12" r="8"/></svg>';
+  const rows = STEPS.map(([k, title, hint, tab]) => {
+    const ok = o.steps[k];
+    return `<div class="row" style="align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--line)">`
+      + `<span style="flex:none">${ok ? chk : dot}</span>`
+      + `<span class="grow" style="min-width:0"><b style="font-size:14px;${ok ? 'opacity:.6;text-decoration:line-through' : ''}">${title}</b><div class="mut" style="font-size:12px">${hint}</div></span>`
+      + (ok ? '' : `<button class="btn sm" onclick="switchTab('${tab}')">Настроить</button>`) + `</div>`;
+  }).join('');
+  const pct = Math.round(o.done / o.total * 100);
+  const html = '<div class="card" style="border-color:rgba(34,211,238,.35);background:linear-gradient(150deg,rgba(34,211,238,.06),var(--card))">'
+    + `<div class="row" style="justify-content:space-between;align-items:center"><b style="font-size:16px">🚀 Быстрый старт — настройте панель</b>`
+    + `<span class="row" style="gap:10px"><span class="mut" style="font-size:13px">${o.done} из ${o.total}</span><button class="btn sec sm" onclick="localStorage.setItem('kand_onb_hidden','1');RENDER.dashboard()">Скрыть</button></span></div>`
+    + `<div class="bar" style="height:7px;border-radius:6px;background:#0c1526;margin:10px 0 4px;overflow:hidden"><i style="display:block;height:100%;width:${pct}%;background:linear-gradient(90deg,var(--acc),#7dd3fc)"></i></div>`
+    + rows + '</div>';
+  el.insertAdjacentHTML('afterbegin', html);
+}
 // индикатор свежести данных (синк из БД бота) + ручной запуск
 async function loadSyncStatus() {
   const box = document.getElementById('sync_box'); if (!box || box.dataset.synced) return;

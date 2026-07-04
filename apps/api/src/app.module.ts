@@ -34,6 +34,7 @@ import { FinanceModule } from './finance/finance.module';
 import { BridgeModule } from './bridge/bridge.module';
 import { SyncModule } from './sync/sync.module';
 import { FeaturesModule } from './features/features.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { FeaturesModule } from './features/features.module';
     BridgeModule,
     SyncModule,
     FeaturesModule,
+    OnboardingModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

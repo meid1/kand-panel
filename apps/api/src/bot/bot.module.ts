@@ -11,10 +11,11 @@ import { PromoModule } from '../promo/promo.module';
 import { GiftsModule } from '../gifts/gifts.module';
 import { CampaignsModule } from '../campaigns/campaigns.module';
 import { WithdrawalsModule } from '../withdrawals/withdrawals.module';
+import { PollsModule } from '../polls/polls.module';
 import { BotService } from './bot.service';
 
 @Module({
-  imports: [SettingsModule, UsersModule, DevicesModule, PaymentsModule, BypassModule, ReferralModule, PlansModule, BroadcastModule, PromoModule, GiftsModule, CampaignsModule, WithdrawalsModule],
+  imports: [SettingsModule, UsersModule, DevicesModule, PaymentsModule, BypassModule, ReferralModule, PlansModule, BroadcastModule, PromoModule, GiftsModule, CampaignsModule, WithdrawalsModule, PollsModule],
   providers: [BotService],
 })
 export class BotModule {}

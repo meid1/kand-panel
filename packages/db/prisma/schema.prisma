@@ -119,6 +119,37 @@ model Campaign {
   users       User[]
 }
 
+/// Опрос/конкурс: клиент голосует в боте и получает награду (дни). Голос — 1 раз.
+model Poll {
+  id         String       @id @default(cuid())
+  tenantId   String?
+  question   String
+  rewardDays Int          @default(0) // дней за участие (0 = без награды)
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  options    PollOption[]
+  votes      PollVote[]
+}
+
+model PollOption {
+  id     String @id @default(cuid())
+  pollId String
+  poll   Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  text   String
+  votes  Int    @default(0)
+  order  Int    @default(0)
+}
+
+model PollVote {
+  id        String   @id @default(cuid())
+  pollId    String
+  poll      Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  userId    String
+  optionId  String
+  createdAt DateTime @default(now())
+  @@unique([pollId, userId])
+}
+
 /// Тикеты поддержки: обращения клиента (из бота/кабинета) и ответы админа.
 model Ticket {
   id        String   @id @default(cuid())

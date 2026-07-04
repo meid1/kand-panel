@@ -12,6 +12,7 @@ import { PromoService } from '../promo/promo.service';
 import { GiftsService } from '../gifts/gifts.service';
 import { CampaignsService } from '../campaigns/campaigns.service';
 import { WithdrawalsService } from '../withdrawals/withdrawals.service';
+import { PollsService } from '../polls/polls.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { FeaturesService } from '../features/features.service';
 import { tg, InlineButton } from './telegram';
@@ -43,6 +44,7 @@ export class BotService implements OnModuleInit {
     private gifts: GiftsService,
     private campaigns: CampaignsService,
     private withdrawals: WithdrawalsService,
+    private polls: PollsService,
     private tickets: TicketsService,
     private features: FeaturesService,
   ) {}
@@ -139,12 +141,34 @@ export class BotService implements OnModuleInit {
       [await b('btn.trial', 'trial'), await b('btn.referral', 'referral')],
       [{ text: '🎁 Промокод', callback_data: 'promo' }, await b('btn.support', 'support')],
     ];
+    // активные опросы — показываем кнопку, только если есть
+    if (await this.prisma.poll.count({ where: { isActive: true } }) > 0) rows.push([{ text: '📊 Опросы', callback_data: 'polls' }]);
     // кастомные кнопки (создаёт админ): url → ссылка, text → показать текст
     const custom = await this.settings.getButtons();
     custom.forEach((c: any, i: number) => {
       rows.push([c.action === 'url' ? { text: c.text, url: c.value } : { text: c.text, callback_data: `cbx:${i}` }]);
     });
     return rows;
+  }
+
+  private async sendPolls(chatId: number, user: any) {
+    const polls = await this.polls.activeForUser(user.id);
+    const open = polls.filter((p: any) => !p.voted);
+    if (!open.length) return tg.sendMessage(this.token, chatId, polls.length ? '✅ Вы уже прошли все активные опросы.' : 'Сейчас нет активных опросов.', await this.menu());
+    for (const p of open) {
+      const kb = p.options.map((o: any) => [{ text: o.text, callback_data: `pv:${o.id}` }]);
+      const reward = p.rewardDays > 0 ? `\n🎁 За участие: +${p.rewardDays} дн.` : '';
+      await tg.sendMessage(this.token, chatId, `📊 <b>${p.question}</b>${reward}`, kb);
+    }
+  }
+
+  private async votePoll(chatId: number, user: any, optionId: string) {
+    try {
+      const r = await this.polls.vote(user.id, optionId);
+      await tg.sendMessage(this.token, chatId, `✅ ${r.message}`, await this.menu());
+    } catch (e: any) {
+      await tg.sendMessage(this.token, chatId, `❌ ${e.message || 'не удалось проголосовать'}`, await this.menu());
+    }
   }
 
   private panelUrl(): string {
@@ -329,6 +353,8 @@ export class BotService implements OnModuleInit {
     }
     if (data === 'referral') return this.sendReferral(chatId, user);
     if (data === 'withdraw') return this.startWithdraw(chatId, user);
+    if (data === 'polls') return this.sendPolls(chatId, user);
+    if (data.startsWith('pv:')) return this.votePoll(chatId, user, data.slice(3));
     if (data === 'promo') { this.awaiting.set(chatId, 'promo'); return tg.sendMessage(this.token, chatId, '🎁 Пришлите промокод или подарочный код одним сообщением:'); }
     // кастомная кнопка с действием «показать текст»
     if (data.startsWith('cbx:')) {

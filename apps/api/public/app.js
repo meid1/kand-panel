@@ -97,6 +97,7 @@ const NAV_ICONS = (() => {
     promogroups: w('<path d="M20.6 12.6 12 21l-8.6-8.6a3 3 0 0 1 0-4.2l4.2-4.2a3 3 0 0 1 4.2 0l8.8 8.8z"/><circle cx="7.5" cy="7.5" r="1.3"/>'),
     campaigns: w('<path d="M3 11v2a1 1 0 0 0 1 1h3l4 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M15.5 8.5a4 4 0 0 1 0 7"/><path d="M18 6a7 7 0 0 1 0 12"/>'),
     withdrawals: w('<rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/><path d="M6 6V4h12v2"/>'),
+    polls: w('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
     broadcast: w('<path d="M22 2 11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>'),
     tenants: w('<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 21v-4h6v4"/><path d="M8 7h.01M12 7h.01M16 7h.01M8 11h.01M12 11h.01M16 11h.01"/>'),
     brand: w('<circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="10" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="15.5" cy="10" r="1"/><circle cx="10" cy="15" r="1"/>'),
@@ -1106,6 +1107,34 @@ RENDER.withdrawals = async function () {
   } catch (e) { document.getElementById('wd_list').textContent = e.message; }
 };
 async function wdSet(id, status) { if (status === 'rejected' && !confirm('Отклонить заявку? Деньги вернутся клиенту на реф-баланс.')) return; try { await api('/withdrawals/' + id + '/status', { method: 'POST', body: JSON.stringify({ status }) }); toast('готово'); RENDER.withdrawals(); } catch (e) { toast(e.message); } }
+
+// ── ОПРОСЫ / КОНКУРСЫ ─────────────────────────────────────────────────────────
+RENDER.polls = async function () {
+  const el = document.getElementById('tab-polls');
+  el.innerHTML = '<div class="card"><b>Новый опрос / конкурс</b>'
+    + '<div class="mut" style="font-size:12px">Клиент голосует в боте один раз и получает награду (дни). Кнопка «📊 Опросы» появляется в боте, пока опрос активен.</div>'
+    + '<label class="fld" style="margin-top:8px">Вопрос</label><input id="pl_q" placeholder="Какой сервер добавить следующим?">'
+    + '<label class="fld">Варианты (по одному в строке, минимум 2)</label><textarea id="pl_opts" placeholder="🇯🇵 Япония&#10;🇰🇷 Корея&#10;🇸🇬 Сингапур"></textarea>'
+    + '<div class="row" style="margin-top:8px"><input id="pl_reward" type="number" placeholder="награда, дней" style="max-width:160px"><button class="btn" onclick="addPoll()">Создать опрос</button></div></div>'
+    + '<div class="card"><b>Опросы</b><div id="pl_list" class="mut">загрузка…</div></div>';
+  try {
+    const list = await api('/polls');
+    document.getElementById('pl_list').innerHTML = list.length ? list.map((p) => {
+      const total = p.options.reduce((s, o) => s + o.votes, 0);
+      const bars = p.options.map((o) => { const pct = total ? Math.round((o.votes / total) * 100) : 0; return `<div style="margin:4px 0"><div class="row" style="justify-content:space-between"><span>${esc(o.text)}</span><span class="mut">${o.votes} · ${pct}%</span></div><div style="height:8px;background:#1b2740;border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.max(2, pct)}%;background:var(--acc,#22D3EE)"></div></div></div>`; }).join('');
+      return `<div style="border-top:1px solid var(--line);padding-top:10px;margin-top:10px"><div class="row" style="justify-content:space-between"><b>${esc(p.question)}</b> <span>${p.isActive ? '<span class="pill ok">активен</span>' : '<span class="pill">завершён</span>'}</span></div><div class="mut" style="font-size:12px">награда ${p.rewardDays} дн. · проголосовало ${p._count.votes}</div>${bars}<div class="row" style="margin-top:6px"><button class="btn sec sm" onclick="togglePoll('${p.id}',${!p.isActive})">${p.isActive ? 'завершить' : 'активировать'}</button> <button class="btn bad sm" onclick="delPoll('${p.id}')">удалить</button></div></div>`;
+    }).join('') : '<span class="mut">нет опросов</span>';
+  } catch (e) { document.getElementById('pl_list').textContent = e.message; }
+};
+async function addPoll() {
+  const options = document.getElementById('pl_opts').value.split('\n').map((s) => s.trim()).filter(Boolean);
+  const body = { question: document.getElementById('pl_q').value.trim(), options, rewardDays: +document.getElementById('pl_reward').value || 0 };
+  if (!body.question) return toast('укажи вопрос');
+  if (options.length < 2) return toast('нужно минимум 2 варианта');
+  try { await api('/polls', { method: 'POST', body: JSON.stringify(body) }); toast('опрос создан'); RENDER.polls(); } catch (e) { toast(e.message); }
+}
+async function togglePoll(id, active) { try { await api('/polls/' + id, { method: 'PATCH', body: JSON.stringify({ isActive: active }) }); RENDER.polls(); } catch (e) { toast(e.message); } }
+async function delPoll(id) { if (!confirm('Удалить опрос?')) return; try { await api('/polls/' + id, { method: 'DELETE' }); RENDER.polls(); } catch (e) { toast(e.message); } }
 
 // ── ПЛАТЁЖКИ ─────────────────────────────────────────────────────────────────
 RENDER.payments = async function () {

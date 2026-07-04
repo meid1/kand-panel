@@ -17,6 +17,7 @@ const TABS = [
   ['tenants', '07-admin-franchises'],
   ['finance', '08-admin-finance'],
   ['traffic', '09-admin-traffic'],
+  ['tickets', '11-admin-tickets'],
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -34,7 +35,9 @@ await page.waitForSelector('#app:not(.hidden)', { timeout: 10000 });
 await sleep(1200);
 
 for (const [tab, name] of TABS) {
-  await page.click(`nav button[data-tab="${tab}"]`);
+  const btn = await page.$(`nav button[data-tab="${tab}"]`);
+  if (!btn || !(await btn.isVisible())) { console.log('· пропуск (скрыта):', name); continue; }
+  await btn.click();
   await sleep(1500); // дать прогрузиться данным/графику
   await page.screenshot({ path: join(OUT, `${name}.png`) });
   console.log('✓', name);

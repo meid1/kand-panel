@@ -39,6 +39,7 @@ import { TicketsModule } from './tickets/tickets.module';
 import { GiftsModule } from './gifts/gifts.module';
 import { PromoGroupsModule } from './promo-groups/promo-groups.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
+import { WithdrawalsModule } from './withdrawals/withdrawals.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { CampaignsModule } from './campaigns/campaigns.module';
     GiftsModule,
     PromoGroupsModule,
     CampaignsModule,
+    WithdrawalsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

@@ -41,6 +41,7 @@ model User {
   referralCode String?  @unique // личный код-приглашение (для реф-ссылки)
   referrerId   String?  // кто пригласил (User.id того же тенанта)
   refEarnedDays Int     @default(0) // сколько дней заработано на рефералах
+  refEarnedMoney Decimal @default(0) // реф-баланс ДЕНЬГАМИ (доступно к выводу)
   refFirstPay  Boolean  @default(false) // была ли уже первая оплата (чтобы наградить пригласившего 1 раз)
   agreedTerms  Boolean  @default(false) // согласие с условиями/офертой
   remindStage  Int      @default(0) // напоминания об истечении: 0=нет,1=за3д,2=за1д,3=истекло
@@ -61,6 +62,7 @@ model User {
   bypass       BypassUsage?
   tickets      Ticket[]
   savedCards   SavedCard[]
+  withdrawals  Withdrawal[]
   @@unique([tenantId, tgId]) // Phase 0 изоляция: (тенант, tg) = 1 аккаунт
   @@index([tenantId, externalId]) // дедуп при импорте по исходному id
   @@index([promoGroupId])
@@ -75,6 +77,21 @@ model PromoGroup {
   discountPct Int      @default(0) // 0..100
   createdAt   DateTime @default(now())
   users       User[]
+}
+
+/// Заявка на вывод реф-средств деньгами: клиент запрашивает → админ выплачивает/отклоняет.
+model Withdrawal {
+  id          String    @id @default(cuid())
+  tenantId    String?
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  amount      Decimal
+  requisites  String    // куда платить (карта/кошелёк)
+  status      String    @default("pending") // pending | paid | rejected
+  note        String?
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+  @@index([tenantId, status, createdAt])
 }
 
 /// Сохранённая карта для рекуррента (автосписание). methodId — токен карты у провайдера.

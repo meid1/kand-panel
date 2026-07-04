@@ -71,6 +71,14 @@ export class ReferralService {
       });
       this.log.log(`реферал: ${u.referrerId} +${rewardDays} дн. за оплату ${userId}`);
     }
+    // деньгами (если задан referral.reward_money) — копится на реф-баланс, доступно к выводу
+    const rewardMoney = await this.setting('referral.reward_money', 0);
+    if (rewardMoney > 0) {
+      await this.prisma.user.update({
+        where: { id: u.referrerId }, data: { refEarnedMoney: { increment: rewardMoney } },
+      });
+      this.log.log(`реферал: ${u.referrerId} +${rewardMoney}₽ за оплату ${userId}`);
+    }
   }
 
   /** Ссылка + статистика для клиента (бот/кабинет). */
@@ -81,6 +89,6 @@ export class ReferralService {
     const paid = await this.prisma.user.count({ where: { referrerId: userId, refFirstPay: true } });
     const botUser = (await this.prisma.setting.findUnique({ where: { key: 'bot.username' } }))?.value;
     const link = botUser ? `https://t.me/${botUser}?start=ref_${code}` : `ref_${code}`;
-    return { code, link, invited, paid, earnedDays: u?.refEarnedDays || 0 };
+    return { code, link, invited, paid, earnedDays: u?.refEarnedDays || 0, earnedMoney: Number(u?.refEarnedMoney || 0) };
   }
 }

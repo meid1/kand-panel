@@ -96,6 +96,7 @@ const NAV_ICONS = (() => {
     gifts: w('<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M4 12v9h16v-9M12 8v13"/><path d="M12 8S9.5 3.5 7 4.8 8.5 8 12 8zM12 8s2.5-4.5 5-3.2S15.5 8 12 8z"/>'),
     promogroups: w('<path d="M20.6 12.6 12 21l-8.6-8.6a3 3 0 0 1 0-4.2l4.2-4.2a3 3 0 0 1 4.2 0l8.8 8.8z"/><circle cx="7.5" cy="7.5" r="1.3"/>'),
     campaigns: w('<path d="M3 11v2a1 1 0 0 0 1 1h3l4 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M15.5 8.5a4 4 0 0 1 0 7"/><path d="M18 6a7 7 0 0 1 0 12"/>'),
+    withdrawals: w('<rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/><path d="M6 6V4h12v2"/>'),
     broadcast: w('<path d="M22 2 11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>'),
     tenants: w('<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 21v-4h6v4"/><path d="M8 7h.01M12 7h.01M16 7h.01M8 11h.01M12 11h.01M16 11h.01"/>'),
     brand: w('<circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="10" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="15.5" cy="10" r="1"/><circle cx="10" cy="15" r="1"/>'),
@@ -1083,6 +1084,25 @@ async function addCampaign() {
   try { await api('/campaigns', { method: 'POST', body: JSON.stringify(body) }); toast('кампания создана'); RENDER.campaigns(); } catch (e) { toast(e.message); }
 }
 async function delCampaign(id) { if (!confirm('Удалить кампанию? Привязка клиентов снимется.')) return; try { await api('/campaigns/' + id, { method: 'DELETE' }); RENDER.campaigns(); } catch (e) { toast(e.message); } }
+
+// ── ВЫВОДЫ РЕФ-СРЕДСТВ ────────────────────────────────────────────────────────
+let WD_STATUS = 'pending';
+function wdBadge(s) { return s === 'paid' ? '<span class="pill ok">выплачено</span>' : s === 'rejected' ? '<span class="pill bad">отклонено</span>' : '<span class="pill warn">ожидает</span>'; }
+function setWdStatus(s) { WD_STATUS = s; RENDER.withdrawals(); }
+RENDER.withdrawals = async function () {
+  const el = document.getElementById('tab-withdrawals');
+  el.innerHTML = '<div class="card"><b>Заявки на вывод реф-средств</b>'
+    + '<div class="mut" style="font-size:12px">Клиент копит реф-баланс деньгами (настройка «Реферал: ₽ за 1-ю оплату» в Бренде) и запрашивает вывод в боте. Выплати вручную по реквизитам и отметь «выплатил».</div>'
+    + '<div class="row" style="gap:6px;margin:8px 0"><button class="btn sec sm" onclick="setWdStatus(\'pending\')">Ожидают</button><button class="btn sec sm" onclick="setWdStatus(\'paid\')">Выплачены</button><button class="btn sec sm" onclick="setWdStatus(\'\')">Все</button></div>'
+    + '<div id="wd_list" class="mut">загрузка…</div></div>';
+  try {
+    const list = await api('/withdrawals' + (WD_STATUS ? '?status=' + WD_STATUS : ''));
+    document.getElementById('wd_list').innerHTML = list.length ? '<table><tr><th>Клиент</th><th>Сумма</th><th>Реквизиты</th><th>Статус</th><th>Дата</th><th></th></tr>'
+      + list.map((w) => `<tr><td>${esc(w.user?.tgName || w.user?.tgId || '—')}${w.user?.tgUsername ? ` <span class="mut">@${esc(w.user.tgUsername)}</span>` : ''}</td><td><b>${Number(w.amount)}₽</b></td><td class="mut">${esc(w.requisites)}</td><td>${wdBadge(w.status)}</td><td class="mut">${new Date(w.createdAt).toLocaleString()}</td><td>${w.status === 'pending' ? `<button class="btn sm" onclick="wdSet('${w.id}','paid')">✅ выплатил</button> <button class="btn bad sm" onclick="wdSet('${w.id}','rejected')">✕ отклонить</button>` : ''}</td></tr>`).join('') + '</table>'
+      : '<span class="mut">нет заявок</span>';
+  } catch (e) { document.getElementById('wd_list').textContent = e.message; }
+};
+async function wdSet(id, status) { if (status === 'rejected' && !confirm('Отклонить заявку? Деньги вернутся клиенту на реф-баланс.')) return; try { await api('/withdrawals/' + id + '/status', { method: 'POST', body: JSON.stringify({ status }) }); toast('готово'); RENDER.withdrawals(); } catch (e) { toast(e.message); } }
 
 // ── ПЛАТЁЖКИ ─────────────────────────────────────────────────────────────────
 RENDER.payments = async function () {

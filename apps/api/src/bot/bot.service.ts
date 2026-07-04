@@ -11,6 +11,7 @@ import { BroadcastService } from '../broadcast/broadcast.service';
 import { PromoService } from '../promo/promo.service';
 import { GiftsService } from '../gifts/gifts.service';
 import { CampaignsService } from '../campaigns/campaigns.service';
+import { WithdrawalsService } from '../withdrawals/withdrawals.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { FeaturesService } from '../features/features.service';
 import { tg, InlineButton } from './telegram';
@@ -41,6 +42,7 @@ export class BotService implements OnModuleInit {
     private promo: PromoService,
     private gifts: GiftsService,
     private campaigns: CampaignsService,
+    private withdrawals: WithdrawalsService,
     private tickets: TicketsService,
     private features: FeaturesService,
   ) {}
@@ -234,6 +236,15 @@ export class BotService implements OnModuleInit {
     if (this.awaiting.has(msg.chat.id)) {
       const st = this.awaiting.get(msg.chat.id);
       if (st === 'promo') { this.awaiting.delete(msg.chat.id); return this.redeemPromo(msg.chat.id, user, msg.text.trim()); }
+      if (st === 'withdraw') {
+        this.awaiting.delete(msg.chat.id);
+        const r = await this.referral.stats(user.id);
+        if (r.earnedMoney <= 0) return tg.sendMessage(this.token, msg.chat.id, 'Нет средств для вывода.', await this.menu());
+        try {
+          await this.withdrawals.request(user.id, r.earnedMoney, msg.text.trim());
+          return tg.sendMessage(this.token, msg.chat.id, `✅ Заявка на вывод ${r.earnedMoney}₽ принята. Выплатим в ближайшее время.`, await this.menu());
+        } catch (e: any) { return tg.sendMessage(this.token, msg.chat.id, `❌ ${e.message}`, await this.menu()); }
+      }
       if (st === 'ticket') {
         this.awaiting.delete(msg.chat.id);
         await this.tickets.open(user.id, 'Обращение из бота', msg.text.trim(), user.tenantId).catch(() => {});
@@ -317,6 +328,7 @@ export class BotService implements OnModuleInit {
       return tg.sendMessage(this.token, chatId, '✅ Автопродление включено. При истечении подписки спишем с баланса и продлим. Не забудьте держать баланс пополненным.', await this.menu());
     }
     if (data === 'referral') return this.sendReferral(chatId, user);
+    if (data === 'withdraw') return this.startWithdraw(chatId, user);
     if (data === 'promo') { this.awaiting.set(chatId, 'promo'); return tg.sendMessage(this.token, chatId, '🎁 Пришлите промокод или подарочный код одним сообщением:'); }
     // кастомная кнопка с действием «показать текст»
     if (data.startsWith('cbx:')) {
@@ -330,10 +342,20 @@ export class BotService implements OnModuleInit {
     const rewardS = await this.prisma.setting.findUnique({ where: { key: 'referral.reward_days' } });
     const reward = rewardS ? Number(rewardS.value) || 0 : 0;
     const rewardLine = reward > 0 ? `\nЗа каждого друга, который оплатит, ты получишь <b>${reward} дн.</b>` : '';
+    const moneyLine = r.earnedMoney > 0 ? ` · к выводу: <b>${r.earnedMoney}₽</b>` : '';
+    const menu = await this.menu();
+    const kb = r.earnedMoney > 0 ? [[{ text: `💸 Вывести ${r.earnedMoney}₽`, callback_data: 'withdraw' }], ...menu] : menu;
     await tg.sendMessage(this.token, chatId,
       `🤝 <b>Приглашай друзей</b>${rewardLine}\n\n` +
-      `Приглашено: <b>${r.invited}</b> · оплатили: <b>${r.paid}</b> · заработано: <b>${r.earnedDays} дн.</b>\n\n` +
-      `Твоя ссылка:\n<code>${r.link}</code>`, await this.menu());
+      `Приглашено: <b>${r.invited}</b> · оплатили: <b>${r.paid}</b> · заработано: <b>${r.earnedDays} дн.</b>${moneyLine}\n\n` +
+      `Твоя ссылка:\n<code>${r.link}</code>`, kb);
+  }
+
+  private async startWithdraw(chatId: number, user: any) {
+    const r = await this.referral.stats(user.id);
+    if (r.earnedMoney <= 0) return tg.sendMessage(this.token, chatId, 'Нет средств для вывода.', await this.menu());
+    this.awaiting.set(chatId, 'withdraw');
+    return tg.sendMessage(this.token, chatId, `💸 Вывод ${r.earnedMoney}₽. Пришлите реквизиты для выплаты (номер карты / кошелёк) одним сообщением:`);
   }
 
   private async redeemPromo(chatId: number, user: any, code: string) {

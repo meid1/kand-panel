@@ -35,6 +35,7 @@ import { BridgeModule } from './bridge/bridge.module';
 import { SyncModule } from './sync/sync.module';
 import { FeaturesModule } from './features/features.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
+import { TicketsModule } from './tickets/tickets.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
     SyncModule,
     FeaturesModule,
     OnboardingModule,
+    TicketsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

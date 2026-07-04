@@ -55,8 +55,45 @@ model User {
   devices      Device[]
   payments     Payment[]
   bypass       BypassUsage?
+  tickets      Ticket[]
   @@unique([tenantId, tgId]) // Phase 0 изоляция: (тенант, tg) = 1 аккаунт
   @@index([tenantId, externalId]) // дедуп при импорте по исходному id
+}
+
+/// Тикеты поддержки: обращения клиента (из бота/кабинета) и ответы админа.
+model Ticket {
+  id        String   @id @default(cuid())
+  tenantId  String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  subject   String
+  status    String   @default("open") // open | answered | closed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  messages  TicketMessage[]
+  @@index([tenantId, status, updatedAt])
+}
+
+model TicketMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  fromAdmin Boolean  @default(false)
+  text      String
+  createdAt DateTime @default(now())
+  @@index([ticketId, createdAt])
+}
+
+/// Подарочные подписки: код покупает один, активирует другой.
+model GiftCode {
+  id         String    @id @default(cuid())
+  tenantId   String?
+  code       String    @unique
+  days       Int
+  buyerId    String?   // кто купил (User.id)
+  redeemedBy String?   // кто активировал (User.id)
+  redeemedAt DateTime?
+  createdAt  DateTime  @default(now())
 }
 
 /// Устройство = один VLESS-uuid, отдаётся в подписке.

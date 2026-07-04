@@ -9,6 +9,8 @@ import { ReferralService } from '../referral/referral.service';
 import { PlansService } from '../plans/plans.service';
 import { BroadcastService } from '../broadcast/broadcast.service';
 import { PromoService } from '../promo/promo.service';
+import { TicketsService } from '../tickets/tickets.service';
+import { FeaturesService } from '../features/features.service';
 import { tg, InlineButton } from './telegram';
 
 /**
@@ -35,6 +37,8 @@ export class BotService implements OnModuleInit {
     private plans: PlansService,
     private broadcast: BroadcastService,
     private promo: PromoService,
+    private tickets: TicketsService,
+    private features: FeaturesService,
   ) {}
 
   // владелец в состоянии ввода (chatId → что вводит): welcome | broadcast
@@ -198,6 +202,11 @@ export class BotService implements OnModuleInit {
     if (this.awaiting.has(msg.chat.id)) {
       const st = this.awaiting.get(msg.chat.id);
       if (st === 'promo') { this.awaiting.delete(msg.chat.id); return this.redeemPromo(msg.chat.id, user, msg.text.trim()); }
+      if (st === 'ticket') {
+        this.awaiting.delete(msg.chat.id);
+        await this.tickets.open(user.id, 'Обращение из бота', msg.text.trim(), user.tenantId).catch(() => {});
+        return tg.sendMessage(this.token, msg.chat.id, '✅ Обращение отправлено! Оператор ответит здесь, в боте.', await this.menu());
+      }
       if (await this.isOwner(from.id)) return this.captureOwnerInput(msg);
     }
     // вход в админку бота (только владелец)
@@ -248,8 +257,10 @@ export class BotService implements OnModuleInit {
     if (data === 'account') return this.sendAccount(chatId, user);
     if (data === 'trial') return this.sendTrial(chatId, user);
     if (data === 'support') {
-      return tg.sendMessage(this.token, chatId, await this.subst(await this.settings.getText('text.help')));
+      const kb = this.features.enabled('tickets') ? [[{ text: '✍️ Написать в поддержку', callback_data: 'ticket' }]] : undefined;
+      return tg.sendMessage(this.token, chatId, await this.subst(await this.settings.getText('text.help')), kb);
     }
+    if (data === 'ticket') { this.awaiting.set(chatId, 'ticket'); return tg.sendMessage(this.token, chatId, '✍️ Опишите вопрос одним сообщением — оператор ответит здесь, в боте.'); }
     if (data === 'buy') return this.sendBuyMenu(chatId, user);
     if (data.startsWith('plan:')) return this.sendPayMethods(chatId, data.slice(5), user);
     if (data.startsWith('pay:')) { const [, planId, provider] = data.split(':'); return this.createInvoice(chatId, user, provider, planId); }

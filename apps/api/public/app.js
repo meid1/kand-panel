@@ -88,6 +88,7 @@ const NAV_ICONS = (() => {
     nodes: w('<rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/>'),
     traffic: w('<path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/>'),
     hwid: w('<path d="M12 2.5l8.5 4.7v9.6L12 21.5 3.5 16.8V7.2z"/><path d="M12 21.5V12M3.7 7.2 12 12l8.3-4.8"/>'),
+    tickets: w('<path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5z"/>'),
     audit: w('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>'),
     texts: w('<path d="M12 20h9"/><path d="M16.5 3.5a2 2 0 0 1 3 3L8 18l-4 1 1-4z"/>'),
     plans: w('<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13V22"/>'),
@@ -335,6 +336,51 @@ async function loadTxns() {
 async function setPayStatus(id, status) {
   if (!status) return;
   try { await api('/payments/' + id + '/status', { method: 'POST', body: JSON.stringify({ status }) }); toast('статус изменён'); loadTxns(); } catch (e) { toast(e.message); }
+}
+
+// ── ПОДДЕРЖКА (тикеты) ───────────────────────────────────────────────────────
+let TK_STATUS = 'open';
+RENDER.tickets = async function () {
+  const el = document.getElementById('tab-tickets');
+  const st = [['open', 'Открытые'], ['answered', 'Отвечено'], ['closed', 'Закрытые'], ['', 'Все']];
+  el.innerHTML = '<div class="phead" style="margin-bottom:12px"><h2>Поддержка</h2><div class="sub">обращения клиентов из бота и кабинета — отвечайте прямо отсюда</div></div>'
+    + '<div class="row" style="gap:6px;margin-bottom:12px">' + st.map(([v, t]) => `<button class="qbtn ${TK_STATUS === v ? 'on' : ''}" onclick="setTkStatus('${v}')">${t}</button>`).join('') + '</div>'
+    + '<div id="tk_list" class="mut">загрузка…</div>';
+  try {
+    const rows = await api('/tickets' + (TK_STATUS ? '?status=' + TK_STATUS : ''));
+    const badge = (s) => ({ open: '<span class="pill bad">открыт</span>', answered: '<span class="pill ok">отвечено</span>', closed: '<span class="pill">закрыт</span>' }[s] || esc(s));
+    document.getElementById('tk_list').innerHTML = rows.length ? '<table><tr><th>Клиент</th><th>Тема</th><th>Сообщений</th><th>Статус</th><th>Обновлён</th></tr>'
+      + rows.map((t) => `<tr style="cursor:pointer" onclick="openTicket('${t.id}')"><td>${esc(t.user?.tgName || t.user?.tgUsername || t.user?.tgId || '—')}</td>`
+        + `<td>${esc(t.subject)}</td><td class="mut">${t._count?.messages || 0}</td><td>${badge(t.status)}</td>`
+        + `<td class="mut">${new Date(t.updatedAt).toLocaleString()}</td></tr>`).join('') + '</table>'
+      : '<div class="mut">нет обращений</div>';
+  } catch (e) { document.getElementById('tk_list').textContent = e.message; }
+};
+function setTkStatus(v) { TK_STATUS = v; RENDER.tickets(); }
+async function openTicket(id) {
+  try {
+    const t = await api('/tickets/' + id);
+    const msgs = t.messages.map((m) => `<div style="margin:8px 0;display:flex;${m.fromAdmin ? 'justify-content:flex-end' : ''}">`
+      + `<div style="max-width:78%;padding:9px 13px;border-radius:12px;font-size:14px;${m.fromAdmin ? 'background:var(--acc);color:#04121a' : 'background:var(--cardhi);border:1px solid var(--line)'}">`
+      + `${esc(m.text)}<div style="font-size:10.5px;opacity:.7;margin-top:3px">${new Date(m.createdAt).toLocaleString()}</div></div></div>`).join('');
+    const box = document.createElement('div'); box.className = 'umodal'; box.onclick = (e) => { if (e.target === box) box.remove(); };
+    box.innerHTML = `<div class="card umodal-box"><div class="row" style="justify-content:space-between;align-items:center"><b>${esc(t.subject)}</b>`
+      + `<button class="btn sec sm" onclick="this.closest('.umodal').remove()">✕</button></div>`
+      + `<div class="mut" style="font-size:12px;margin:2px 0 10px">${esc(t.user?.tgName || t.user?.tgUsername || t.user?.tgId || '')}</div>`
+      + `<div style="max-height:46vh;overflow:auto;padding:4px 0">${msgs}</div>`
+      + `<textarea id="tk_reply" placeholder="Ваш ответ клиенту…" style="margin-top:10px"></textarea>`
+      + `<div class="row" style="justify-content:space-between;margin-top:8px"><div class="row" style="gap:6px">`
+      + `<button class="btn" onclick="ticketReply('${t.id}')">Ответить</button>`
+      + `<button class="btn sec sm" onclick="ticketStatus('${t.id}','closed')">Закрыть тикет</button></div></div></div>`;
+    document.body.appendChild(box);
+  } catch (e) { toast(e.message); }
+}
+async function ticketReply(id) {
+  const text = document.getElementById('tk_reply').value.trim(); if (!text) return toast('впишите ответ');
+  try { await api('/tickets/' + id + '/reply', { method: 'POST', body: JSON.stringify({ text }) }); toast('ответ отправлен клиенту'); document.querySelector('.umodal')?.remove(); RENDER.tickets(); } catch (e) { toast(e.message); }
+}
+async function ticketStatus(id, status) {
+  try { await api('/tickets/' + id + '/status', { method: 'POST', body: JSON.stringify({ status }) }); toast('статус обновлён'); document.querySelector('.umodal')?.remove(); RENDER.tickets(); } catch (e) { toast(e.message); }
 }
 
 // ── ФИНАНСЫ ──────────────────────────────────────────────────────────────────

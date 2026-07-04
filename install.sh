@@ -147,6 +147,11 @@ NGINX
     && log "HTTPS выдан" || warn "certbot не выдал сертификат (проверь, что $DOMAIN указывает A-записью на этот сервер)"
 fi
 
+# ── команда управления `kand` ────────────────────────────────────────────────
+chmod +x "$DIR/kand.sh" "$DIR/update.sh" 2>/dev/null || true
+mkdir -p "$DIR/backups"
+if [ -f "$DIR/kand.sh" ]; then ln -sf "$DIR/kand.sh" /usr/local/bin/kand 2>/dev/null || true; fi
+
 # ── итог ─────────────────────────────────────────────────────────────────────
 echo
 log "════════════════════════════════════════════"
@@ -155,5 +160,6 @@ log " Панель:  ${PANEL_URL}"
 log " Логин:   admin"
 log " Пароль:  ${ADMIN_PASSWORD}"
 log "════════════════════════════════════════════"
-log " Управление: cd ${DIR} && docker compose -f infra/docker-compose.prod.yml [logs|restart|down]"
+log " Обновление:  kand update      (с бэкапом БД, данные не теряются)"
+log " Управление:  kand logs | restart | backup | status"
 [ "$HTTPS" = "1" ] || warn "Совет: для боевого использования поставь домен и перезапусти с --https."

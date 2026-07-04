@@ -206,4 +206,30 @@ export class UsersService {
     const u = await this.prisma.user.update({ where: { id }, data: { balance: { increment: amount } } });
     return { ok: true, balance: Number(u.balance) };
   }
+
+  /**
+   * Пакетные операции над выбранными клиентами (по списку id).
+   * action: extend (value=дни ±) | block | unblock | balance (value=₽ ±).
+   * Идём по одному, переиспользуя атомарные методы; собираем ошибки, не падаем целиком.
+   */
+  async bulk(action: string, ids: string[], value?: number) {
+    if (!Array.isArray(ids) || !ids.length) throw new BadRequestException('не выбраны клиенты');
+    if (ids.length > 5000) throw new BadRequestException('слишком много за раз (макс 5000)');
+    if (!['extend', 'block', 'unblock', 'balance'].includes(action)) throw new BadRequestException('неизвестное действие');
+    if ((action === 'extend' || action === 'balance') && (value == null || Number.isNaN(value))) {
+      throw new BadRequestException('нужно значение (дни/сумма)');
+    }
+    const failed: { id: string; error: string }[] = [];
+    let done = 0;
+    for (const id of ids) {
+      try {
+        if (action === 'extend') await this.grantDays(id, value!);
+        else if (action === 'block') await this.setBlocked(id, true);
+        else if (action === 'unblock') await this.setBlocked(id, false);
+        else if (action === 'balance') await this.adjustBalance(id, value!);
+        done++;
+      } catch (e: any) { failed.push({ id, error: e?.message || 'ошибка' }); }
+    }
+    return { ok: true, done, failed };
+  }
 }

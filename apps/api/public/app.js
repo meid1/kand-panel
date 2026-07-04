@@ -679,9 +679,39 @@ RENDER.users = async function () {
     + '<div class="card"><div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">'
     + '<input id="u_search" placeholder="🔍 Имя, @username, ID" style="flex:1;min-width:200px" oninput="onUserSearch(this.value)">'
     + '<select id="u_stsel" style="max-width:170px" onchange="onUserStatus(this.value)"><option value="">Все статусы</option><option value="active">Активные</option><option value="expired">Истёкшие</option><option value="blocked">Заблокированные</option></select></div>'
+    + '<div id="u_bulk" style="margin-top:10px"></div>'
     + '<div id="u_list" class="mut" style="margin-top:10px">загрузка…</div><div id="u_pager" class="row" style="margin-top:10px;gap:10px;align-items:center"></div></div><div id="u_card"></div>';
-  U_OFFSET = 0; U_SEARCH = ''; U_STATUS = ''; loadUsers();
+  U_OFFSET = 0; U_SEARCH = ''; U_STATUS = ''; U_SEL.clear(); loadUsers();
 };
+// ── массовый выбор клиентов (bulk) ───────────────────────────────────────────
+let U_SEL = new Set();
+function toggleSel(id, on) { if (on) U_SEL.add(id); else U_SEL.delete(id); renderBulkBar(); }
+function toggleSelAll(on) { document.querySelectorAll('.u-sel').forEach((cb) => { cb.checked = on; if (on) U_SEL.add(cb.value); else U_SEL.delete(cb.value); }); renderBulkBar(); }
+function clearSel() { U_SEL.clear(); document.querySelectorAll('.u-sel').forEach((cb) => { cb.checked = false; }); const h = document.getElementById('u_selall'); if (h) h.checked = false; renderBulkBar(); }
+function renderBulkBar() {
+  const b = document.getElementById('u_bulk'); if (!b) return;
+  if (!U_SEL.size) { b.innerHTML = ''; return; }
+  b.innerHTML = '<div class="card" style="margin:0;border-color:var(--acc,#22D3EE)"><div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">'
+    + `<b>Выбрано: ${U_SEL.size}</b>`
+    + '<button class="btn sm" onclick="bulkAction(\'extend\')">＋ дни</button>'
+    + '<button class="btn sm" onclick="bulkAction(\'balance\')">₽ баланс</button>'
+    + '<button class="btn bad sm" onclick="bulkAction(\'block\')">🚫 заблокировать</button>'
+    + '<button class="btn sec sm" onclick="bulkAction(\'unblock\')">🔓 разблокировать</button>'
+    + '<button class="btn sec sm" onclick="clearSel()">снять выбор</button></div></div>';
+}
+async function bulkAction(action) {
+  const ids = [...U_SEL]; if (!ids.length) return;
+  let value;
+  if (action === 'extend') { const v = prompt(`Начислить/списать дней для ${ids.length} клиентов (можно −):`, '30'); if (v === null) return; value = Number(v); if (!value) return toast('нужно число'); }
+  if (action === 'balance') { const v = prompt(`Изменить баланс для ${ids.length} клиентов, ₽ (можно −):`, '100'); if (v === null) return; value = Number(v); if (!value) return toast('нужно число'); }
+  if ((action === 'block' || action === 'unblock') && !confirm(`${action === 'block' ? 'Заблокировать' : 'Разблокировать'} ${ids.length} клиентов?`)) return;
+  toast('применяю…');
+  try {
+    const r = await api('/users/bulk', { method: 'POST', body: JSON.stringify({ action, ids, value }) });
+    toast(`готово: ${r.done}${r.failed && r.failed.length ? `, ошибок ${r.failed.length}` : ''}`);
+    clearSel(); loadUsers();
+  } catch (e) { toast(e.message); }
+}
 function onUserSearch(v) { U_SEARCH = v.trim(); U_OFFSET = 0; clearTimeout(_uSearchT); _uSearchT = setTimeout(loadUsers, 300); }
 function onUserStatus(v) { U_STATUS = v; U_OFFSET = 0; loadUsers(); }
 function pageUsers(d) { U_OFFSET = Math.max(0, U_OFFSET + d * U_PAGE); loadUsers(); }
@@ -696,7 +726,7 @@ async function loadUsers() {
     const rows = r.rows || r; const total = r.total != null ? r.total : rows.length;
     const cnt = document.getElementById('u_count'); if (cnt) cnt.textContent = total.toLocaleString('ru-RU') + ' найдено';
     const now = Date.now();
-    list.innerHTML = rows.length ? '<table><tr><th>Пользователь</th><th>TG-ID</th><th>Баланс</th><th>Подписка</th><th>Статус</th><th></th></tr>'
+    list.innerHTML = rows.length ? '<table><tr><th style="width:26px"><input type="checkbox" id="u_selall" onclick="toggleSelAll(this.checked)" title="выбрать всё на странице"></th><th>Пользователь</th><th>TG-ID</th><th>Баланс</th><th>Подписка</th><th>Статус</th><th></th></tr>'
       + rows.map((u) => {
         const expMs = u.expireAt ? new Date(u.expireAt).getTime() : null;
         const active = !u.isBlocked && expMs && expMs > now;
@@ -707,10 +737,11 @@ async function loadUsers() {
             : `<span style="color:var(--bad)">истекла</span> <span class="mut">${new Date(expMs).toLocaleDateString()}</span>`)
           : '<span class="mut">—</span>';
         const badge = u.tenant && u.tenant.kind === 'franchise' ? ` <span class="pill brand">🤖 ${esc(u.tenant.brand)}</span>` : '';
-        return `<tr style="cursor:pointer" onclick="openUser('${u.id}')"><td><b>${esc(u.tgName || 'без имени')}</b>${u.tgUsername ? ` <span class="mut">@${esc(u.tgUsername)}</span>` : ''}${badge}</td>`
+        return `<tr style="cursor:pointer" onclick="openUser('${u.id}')"><td onclick="event.stopPropagation()"><input type="checkbox" class="u-sel" value="${u.id}" ${U_SEL.has(u.id) ? 'checked' : ''} onchange="toggleSel('${u.id}',this.checked)"></td><td><b>${esc(u.tgName || 'без имени')}</b>${u.tgUsername ? ` <span class="mut">@${esc(u.tgUsername)}</span>` : ''}${badge}</td>`
           + `<td class="mut">${u.tgId}</td><td>${Number(u.balance || 0)}₽</td><td>${sub}</td><td>${st}</td><td class="mut" style="text-align:right;font-size:18px">›</td></tr>`;
       }).join('') + '</table>'
       : '<span class="mut">ничего не найдено</span>';
+    renderBulkBar();
     const pg = document.getElementById('u_pager');
     if (pg) {
       const from = total ? U_OFFSET + 1 : 0, to = Math.min(U_OFFSET + U_PAGE, total);

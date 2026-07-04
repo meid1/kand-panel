@@ -16,6 +16,12 @@ export class UsersController {
     return this.users.create(dto);
   }
 
+  // Пакетные операции над выбранными клиентами (массовый выбор в админке)
+  @Post('bulk')
+  bulk(@Body() body: { action: string; ids: string[]; value?: number }) {
+    return this.users.bulk(body?.action, body?.ids || [], body?.value != null ? Number(body.value) : undefined);
+  }
+
   // Ручное создание ключа: клиент без Telegram + сразу устройство и ссылки подписки.
   // Отдаём готовые ссылки, чтобы админ мог передать их «на руки».
   @Post('manual')

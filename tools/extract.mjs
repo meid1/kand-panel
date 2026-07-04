@@ -71,7 +71,8 @@ const presets = {
           username: email,
           expireAt: expMs > 0 ? iso(expMs) : null,
           isBlocked: c.enable === false,
-          devices: c.id ? [c.id] : [], // vless uuid
+          // vless uuid + СОХРАНЕНИЕ ССЫЛКИ: subId 3x-ui → subToken (ссылка /sub/<subId> не меняется)
+          devices: c.id ? [{ uuid: c.id, subToken: c.subId || undefined }] : [],
         });
         usage.push({ userExternalId: extId, usedBytes: byEmail.get(email) || 0 });
       }
@@ -98,6 +99,8 @@ const presets = {
         externalId: extId, username: r.username,
         expireAt: r.expire ? iso(Number(r.expire) * 1000) : null, // СЕКУНДЫ
         isBlocked: r.status && String(r.status).toLowerCase() !== 'active',
+        // ссылку Marzban сохранить нельзя (её sub-токен — крипто/JWT от секрета панели),
+        // клиентам выдаётся новая ссылка подписки. Переносим uuid — сам VPN-доступ сохраняется.
         devices: uuid ? [uuid] : [],
       });
       usage.push({ userExternalId: extId, usedBytes: Number(r.used_traffic || 0) });
@@ -108,7 +111,7 @@ const presets = {
   // Remnawave 2.x: PostgreSQL, users + user_traffic. Есть telegram_id и vless_uuid.
   async remnawave() {
     if (!args.conn) die('нужен --conn postgresql://…');
-    const sql = `SELECT u.telegram_id, u.username, u.expire_at, u.status, u.vless_uuid, u.uuid,
+    const sql = `SELECT u.telegram_id, u.username, u.expire_at, u.status, u.vless_uuid, u.uuid, u.short_uuid,
       ut.used_traffic_bytes
       FROM users u LEFT JOIN user_traffic ut ON ut.t_id = u.t_id`;
     const rows = await pgRows(args.conn, sql);
@@ -121,7 +124,8 @@ const presets = {
         username: r.username,
         expireAt: r.expire_at ? iso(r.expire_at) : null,
         isBlocked: r.status && String(r.status).toUpperCase() !== 'ACTIVE',
-        devices: r.vless_uuid ? [r.vless_uuid] : [],
+        // vless uuid + СОХРАНЕНИЕ ССЫЛКИ: short_uuid → subToken (ссылка /sub/<short_uuid> не меняется)
+        devices: r.vless_uuid ? [{ uuid: r.vless_uuid, subToken: r.short_uuid || undefined }] : [],
       });
       usage.push({ userExternalId: extId, usedBytes: Number(r.used_traffic_bytes || 0) });
     }

@@ -66,6 +66,16 @@ export class ImportService {
     const d = new Date(v); return isNaN(d.getTime()) ? null : d;
   }
 
+  // У 3x-ui/Marzban клиенты часто БЕЗ telegram id → нельзя всем ставить tgId=0
+  // (нарушает unique (tenantId,tgId)). Даём детерминированный ОТРИЦАТЕЛЬНЫЙ id из
+  // externalId — не конфликтует с реальными (положительными) tg id и стабилен при реимпорте.
+  private synthTgId(seed: string): bigint {
+    let h = 0n; const s = String(seed || '');
+    for (let i = 0; i < s.length; i++) h = (h * 131n + BigInt(s.charCodeAt(i))) % 1000000000000n;
+    return -(h + 1n);
+  }
+  private randNegTgId(): bigint { return -(BigInt(Math.floor(Math.random() * 1e12)) + 1n); }
+
   private async findUser(tenantId: string, ext?: any, tg?: any) {
     if (ext != null && ext !== '') {
       const u = await this.prisma.user.findFirst({ where: { tenantId, externalId: String(ext) } });
@@ -120,7 +130,8 @@ export class ImportService {
     let created = 0, updated = 0, skipped = 0, devices = 0;
     for (const r of recs) {
       if (!r.tgId && !r.externalId) { skipped++; continue; }
-      const tgId = r.tgId != null ? BigInt(String(r.tgId).replace(/\D/g, '') || '0') : 0n;
+      const digits = r.tgId != null ? String(r.tgId).replace(/\D/g, '') : '';
+      const tgId = digits ? BigInt(digits) : this.synthTgId(r.externalId || r.username || '');
       const expireAt = this.parseExpire(r.expireAt);
       let user = await this.findUser(tenantId, r.externalId, r.tgId);
       if (user) {
@@ -130,9 +141,14 @@ export class ImportService {
           isBlocked: r.isBlocked ?? user.isBlocked, isTrial: false } });
         updated++;
       } else {
-        user = await this.prisma.user.create({ data: {
-          tenantId, tgId, externalId: r.externalId ? String(r.externalId) : null,
-          tgUsername: r.username, tgName: r.name, expireAt, isTrial: false, isBlocked: !!r.isBlocked } });
+        const base = { tenantId, externalId: r.externalId ? String(r.externalId) : null,
+          tgUsername: r.username, tgName: r.name, expireAt, isTrial: false, isBlocked: !!r.isBlocked };
+        try {
+          user = await this.prisma.user.create({ data: { ...base, tgId } });
+        } catch (e: any) {
+          if (e?.code === 'P2002') { user = await this.prisma.user.create({ data: { ...base, tgId: this.randNegTgId() } }); }
+          else throw e;
+        }
         created++;
       }
       const devs = Array.isArray(r.devices) ? r.devices : (r.devices ? [r.devices] : []);

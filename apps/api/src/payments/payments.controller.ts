@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Get, Param, Post, Query, Req, UseGuards,
+  Body, Controller, Get, Param, Post, Put, Query, Req, UseGuards,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
@@ -46,6 +46,19 @@ export class PaymentsController {
   @Get('methods')
   methods() {
     return this.payments.available();
+  }
+
+  // Telegram Stars: конфиг (вкл + курс ₽/звезда) для админки
+  @UseGuards(JwtAuthGuard)
+  @Get('stars')
+  starsConfig() {
+    return this.payments.getStarsConfig();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('stars')
+  setStars(@Body() body: { enabled?: boolean; rubPerStar?: number }) {
+    return this.payments.setStarsConfig(!!body?.enabled, body?.rubPerStar != null ? Number(body.rubPerStar) : undefined);
   }
 
   // ── публичный вебхук провайдера (подпись проверяется внутри провайдера) ────

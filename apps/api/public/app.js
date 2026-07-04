@@ -1069,8 +1069,13 @@ RENDER.payments = async function () {
   const el = document.getElementById('tab-payments');
   el.innerHTML = '<div class="card mut">загрузка…</div>';
   try {
-    const list = await api('/payments/providers');
-    el.innerHTML = '<div class="card"><b>Платёжные системы</b><div class="mut">Включи нужные и впиши ключи. '
+    const [list, stars] = await Promise.all([api('/payments/providers'), api('/payments/stars').catch(() => ({ enabled: false, rubPerStar: 2 }))]);
+    const starsCard = '<div class="card"><b>⭐ Telegram Stars</b>'
+      + '<div class="mut">Нативная оплата звёздами прямо в Telegram (без внешней платёжки и ключей). Курс — сколько рублей в одной звезде (цена тарифа делится на него).</div>'
+      + `<div class="row" style="margin-top:8px"><label class="pill"><input type="checkbox" id="st_en" ${stars.enabled ? 'checked' : ''} style="width:auto;margin:0 6px 0 0">включить</label>`
+      + `<input id="st_rate" type="number" step="0.1" value="${stars.rubPerStar}" placeholder="₽ за звезду" style="max-width:150px"></div>`
+      + '<button class="btn sm" style="margin-top:8px" onclick="saveStars()">Сохранить</button></div>';
+    el.innerHTML = starsCard + '<div class="card"><b>Платёжные системы</b><div class="mut">Включи нужные и впиши ключи. '
       + 'Для СБП (NSPK) — ЮKassa/Platega. Богатых интеграций не трогай без сверки с докой платёжки.</div>'
       + list.map((p) => `<div style="border-top:1px solid var(--line);padding-top:10px;margin-top:10px">`
         + `<label class="fld">${esc(p.title)} ${p.enabled ? '<span class="pill ok">вкл</span>' : '<span class="pill">выкл</span>'} <span class="mut">(${(p.kinds || []).join(', ')})</span></label>`
@@ -1079,6 +1084,10 @@ RENDER.payments = async function () {
         + `<button class="btn sm" onclick="savePay('${p.id}', ${JSON.stringify(p.requiredKeys).replace(/"/g, '&quot;')})">Сохранить</button></div>`).join('') + '</div>';
   } catch (e) { el.innerHTML = '<div class="card">' + esc(e.message) + '</div>'; }
 };
+async function saveStars() {
+  const body = { enabled: document.getElementById('st_en').checked, rubPerStar: Number(document.getElementById('st_rate').value) || 2 };
+  try { await api('/payments/stars', { method: 'PUT', body: JSON.stringify(body) }); toast('сохранено'); RENDER.payments(); } catch (e) { toast(e.message); }
+}
 async function savePay(id, keys) {
   const body = { enabled: document.getElementById('pe_' + id).checked };
   keys.forEach((k) => { const v = document.getElementById('pk_' + id + '_' + k).value; if (v) body[k] = v; });

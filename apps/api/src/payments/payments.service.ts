@@ -210,4 +210,55 @@ export class PaymentsService {
     }
     return out;
   }
+
+  // ── Telegram Stars (нативная оплата XTR внутри Telegram) ─────────────────────
+  private async setting(key: string): Promise<string> {
+    return (await this.prisma.setting.findUnique({ where: { key } }))?.value || '';
+  }
+  /** Курс: сколько рублей в одной звезде (для перевода цены тарифа в звёзды). */
+  private async starsRate(): Promise<number> {
+    const v = Number(await this.setting('pay.stars.rub_per_star'));
+    return v && v > 0 ? v : 2; // дефолт: 2 ₽ за звезду
+  }
+  async getStarsConfig() {
+    return { enabled: (await this.setting('pay.stars.enabled')) === '1', rubPerStar: await this.starsRate() };
+  }
+  async setStarsConfig(enabled: boolean, rubPerStar?: number) {
+    const put = (key: string, value: string) => this.prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } });
+    await put('pay.stars.enabled', enabled ? '1' : '0');
+    const r = Number(rubPerStar);
+    if (r && r > 0) await put('pay.stars.rub_per_star', String(r));
+    return { ok: true };
+  }
+  async starsEnabled(): Promise<boolean> {
+    return (await this.setting('pay.stars.enabled')) === '1';
+  }
+
+  /** Создать «звёздный» платёж (pending) под тариф; вернуть данные для sendInvoice. */
+  async startStars(userId: string, planId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('пользователь не найден');
+    const plan = await this.plans.get(planId);
+    if (!plan) throw new BadRequestException('тариф не найден');
+    const pct = await this.promoGroups.discountPctForUser(user);
+    const price = this.promoGroups.applyDiscount(Number(plan.price), pct);
+    const stars = Math.max(1, Math.round(price / (await this.starsRate())));
+    const payment = await this.prisma.payment.create({
+      data: { tenantId: user.tenantId, userId: user.id, amount: price, method: 'stars', days: plan.days, status: 'pending', description: plan.title },
+    });
+    return { paymentId: payment.id, stars, title: plan.title, days: plan.days };
+  }
+
+  /** Завершить «звёздный» платёж после successful_payment (payload = paymentId). Идемпотентно. */
+  async completeStars(payload: string) {
+    const payment = await this.prisma.payment.findUnique({ where: { id: String(payload || '') } });
+    if (!payment) throw new NotFoundException('платёж не найден');
+    if (payment.status === 'paid') return { ok: true, days: payment.days };
+    const flip = await this.prisma.payment.updateMany({ where: { id: payment.id, status: { not: 'paid' } }, data: { status: 'paid', paidAt: new Date() } });
+    if (flip.count === 0) return { ok: true, days: payment.days };
+    if (payment.days) await this.users.grantDays(payment.userId, payment.days);
+    await this.referral.rewardOnFirstPayment(payment.userId);
+    this.log.log(`оплата ${payment.id} (stars) → +${payment.days} дн.`);
+    return { ok: true, days: payment.days };
+  }
 }

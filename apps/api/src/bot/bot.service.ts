@@ -151,8 +151,26 @@ export class BotService implements OnModuleInit {
 
   // ── роутинг апдейтов ───────────────────────────────────────────────────────
   private async handle(u: any) {
+    if (u.pre_checkout_query) return this.onPreCheckout(u.pre_checkout_query);
+    if (u.message?.successful_payment) return this.onSuccessfulPayment(u.message);
     if (u.message?.text) return this.onMessage(u.message);
     if (u.callback_query) return this.onCallback(u.callback_query);
+  }
+
+  // Telegram Stars: подтверждаем pre-checkout (иначе оплата не проходит)
+  private async onPreCheckout(q: any) {
+    await tg.answerPreCheckoutQuery(this.token, q.id, true).catch(() => {});
+  }
+
+  // Telegram Stars: успешная оплата звёздами → начисляем дни по payload (= paymentId)
+  private async onSuccessfulPayment(msg: any) {
+    const payload = msg.successful_payment?.invoice_payload;
+    try {
+      const r = await this.payments.completeStars(payload);
+      await tg.sendMessage(this.token, msg.chat.id, `✅ Оплачено звёздами: +${r.days} дн.`, await this.menu());
+    } catch (e: any) {
+      await tg.sendMessage(this.token, msg.chat.id, `⚠️ Оплата получена, но начисление не удалось: ${e.message || e}. Напишите в поддержку.`, await this.menu());
+    }
   }
 
   // проверка настройки-флага
@@ -271,6 +289,7 @@ export class BotService implements OnModuleInit {
     if (data === 'buy') return this.sendBuyMenu(chatId, user);
     if (data.startsWith('plan:')) return this.sendPayMethods(chatId, data.slice(5), user);
     if (data.startsWith('pay:')) { const [, planId, provider] = data.split(':'); return this.createInvoice(chatId, user, provider, planId); }
+    if (data.startsWith('stars:')) return this.payWithStars(chatId, user, data.slice(6));
     if (data.startsWith('bal:')) {
       try { const r = await this.payments.payWithBalance(user.id, data.slice(4)); return tg.sendMessage(this.token, chatId, `✅ Оплачено с баланса: +${r.days} дн. Остаток: ${r.balance}₽`, await this.menu()); }
       catch (e: any) { return tg.sendMessage(this.token, chatId, `❌ ${e.message}`, await this.menu()); }
@@ -407,8 +426,25 @@ export class BotService implements OnModuleInit {
     if (user && plan && Number(user.balance || 0) >= Number(plan.price)) {
       buttons.unshift([{ text: `💰 С баланса (${Number(user.balance)}₽)`, callback_data: `bal:${planId}` }]);
     }
+    // Telegram Stars (если включён в админке)
+    if (plan && await this.payments.starsEnabled()) {
+      buttons.push([{ text: '⭐ Telegram Stars', callback_data: `stars:${planId}` }]);
+    }
     if (!buttons.length) return tg.sendMessage(this.token, chatId, 'Оплата временно недоступна.');
     await tg.sendMessage(this.token, chatId, 'Способ оплаты:', buttons);
+  }
+
+  // Telegram Stars: создаём звёздный счёт и отправляем его в чат (оплата внутри Telegram)
+  private async payWithStars(chatId: number, user: any, planId: string) {
+    const now = Date.now();
+    if (now - (this.lastPay.get(chatId) || 0) < 5000) return tg.sendMessage(this.token, chatId, '⏳ Счёт уже создаётся, подождите пару секунд…');
+    this.lastPay.set(chatId, now);
+    try {
+      const r = await this.payments.startStars(user.id, planId);
+      await tg.sendInvoice(this.token, chatId, { title: r.title, description: `Подписка ${r.days} дн.`, payload: r.paymentId, amount: r.stars });
+    } catch (e: any) {
+      await tg.sendMessage(this.token, chatId, `Не удалось создать счёт: ${e.message || e}`);
+    }
   }
 
   // защита от двойного нажатия по «оплатить» (спам-тапы не плодят счета)

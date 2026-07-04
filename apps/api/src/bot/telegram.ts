@@ -42,4 +42,19 @@ export const tg = {
   getChatMember(token: string, chatId: string | number, userId: number) {
     return call(token, 'getChatMember', { chat_id: chatId, user_id: userId });
   },
+  // Счёт в Telegram Stars (валюта XTR, provider_token пустой). amount = число звёзд.
+  sendInvoice(token: string, chatId: number | string, opts: { title: string; description: string; payload: string; amount: number }) {
+    return call(token, 'sendInvoice', {
+      chat_id: chatId,
+      title: opts.title,
+      description: opts.description,
+      payload: opts.payload,
+      provider_token: '', // для XTR — пусто
+      currency: 'XTR',
+      prices: [{ label: opts.title, amount: opts.amount }],
+    });
+  },
+  answerPreCheckoutQuery(token: string, id: string, ok = true, errorMessage?: string) {
+    return call(token, 'answerPreCheckoutQuery', { pre_checkout_query_id: id, ok, ...(ok ? {} : { error_message: errorMessage || 'Оплата недоступна' }) });
+  },
 };

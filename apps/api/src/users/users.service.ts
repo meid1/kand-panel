@@ -212,21 +212,26 @@ export class UsersService {
    * action: extend (value=дни ±) | block | unblock | balance (value=₽ ±).
    * Идём по одному, переиспользуя атомарные методы; собираем ошибки, не падаем целиком.
    */
-  async bulk(action: string, ids: string[], value?: number) {
+  async bulk(action: string, ids: string[], value?: any) {
     if (!Array.isArray(ids) || !ids.length) throw new BadRequestException('не выбраны клиенты');
     if (ids.length > 5000) throw new BadRequestException('слишком много за раз (макс 5000)');
-    if (!['extend', 'block', 'unblock', 'balance'].includes(action)) throw new BadRequestException('неизвестное действие');
-    if ((action === 'extend' || action === 'balance') && (value == null || Number.isNaN(value))) {
-      throw new BadRequestException('нужно значение (дни/сумма)');
+    if (!['extend', 'block', 'unblock', 'balance', 'promoGroup'].includes(action)) throw new BadRequestException('неизвестное действие');
+    let num = 0;
+    if (action === 'extend' || action === 'balance') {
+      num = Number(value);
+      if (value == null || Number.isNaN(num) || !num) throw new BadRequestException('нужно значение (дни/сумма)');
     }
+    // назначение в промо-группу: value=groupId (или пусто → убрать из группы)
+    const groupId = action === 'promoGroup' ? (value ? String(value) : null) : undefined;
     const failed: { id: string; error: string }[] = [];
     let done = 0;
     for (const id of ids) {
       try {
-        if (action === 'extend') await this.grantDays(id, value!);
+        if (action === 'extend') await this.grantDays(id, num);
         else if (action === 'block') await this.setBlocked(id, true);
         else if (action === 'unblock') await this.setBlocked(id, false);
-        else if (action === 'balance') await this.adjustBalance(id, value!);
+        else if (action === 'balance') await this.adjustBalance(id, num);
+        else if (action === 'promoGroup') await this.prisma.user.update({ where: { id }, data: { promoGroupId: groupId ?? null } });
         done++;
       } catch (e: any) { failed.push({ id, error: e?.message || 'ошибка' }); }
     }

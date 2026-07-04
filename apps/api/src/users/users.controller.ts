@@ -18,8 +18,8 @@ export class UsersController {
 
   // Пакетные операции над выбранными клиентами (массовый выбор в админке)
   @Post('bulk')
-  bulk(@Body() body: { action: string; ids: string[]; value?: number }) {
-    return this.users.bulk(body?.action, body?.ids || [], body?.value != null ? Number(body.value) : undefined);
+  bulk(@Body() body: { action: string; ids: string[]; value?: any }) {
+    return this.users.bulk(body?.action, body?.ids || [], body?.value);
   }
 
   // Ручное создание ключа: клиент без Telegram + сразу устройство и ссылки подписки.

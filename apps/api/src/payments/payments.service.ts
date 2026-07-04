@@ -5,6 +5,7 @@ import { ProviderRegistry } from './providers/provider.registry';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { ReferralService } from '../referral/referral.service';
 import { PlansService } from '../plans/plans.service';
+import { PromoGroupsService } from '../promo-groups/promo-groups.service';
 
 /**
  * Оркестрация оплаты поверх реестра провайдеров. Единый путь:
@@ -21,6 +22,7 @@ export class PaymentsService {
     private users: UsersService,
     private referral: ReferralService,
     private plans: PlansService,
+    private promoGroups: PromoGroupsService,
   ) {}
 
   async createInvoice(dto: CreateInvoiceDto) {
@@ -39,6 +41,9 @@ export class PaymentsService {
       const plan = await this.plans.get(dto.planId);
       if (!plan) throw new BadRequestException('тариф не найден');
       amount = Number(plan.price); days = plan.days; description = description || plan.title;
+      // скидка промо-группы клиента (если состоит в сегменте со скидкой)
+      const pct = await this.promoGroups.discountPctForUser(user);
+      if (pct) { amount = this.promoGroups.applyDiscount(amount, pct); description = `${description} (−${pct}%)`; }
     }
     if (dto.topup) { days = null as any; description = description || 'Пополнение баланса'; }
     if (amount == null || (!dto.topup && days == null)) throw new BadRequestException('нужен planId, amount+days или topup');
@@ -130,7 +135,8 @@ export class PaymentsService {
     if (!user) throw new NotFoundException('пользователь не найден');
     const plan = await this.plans.get(planId);
     if (!plan) throw new BadRequestException('тариф не найден');
-    const price = Number(plan.price);
+    const pct = await this.promoGroups.discountPctForUser(user);
+    const price = this.promoGroups.applyDiscount(Number(plan.price), pct);
     if (Number(user.balance) < price) throw new BadRequestException('недостаточно средств на балансе');
     // АТОМАРНОЕ списание: updateMany с условием balance>=price исключает гонку двойного
     // нажатия (два параллельных запроса не спишут дважды). count===0 → уже/недостаточно.

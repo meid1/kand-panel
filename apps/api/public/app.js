@@ -94,6 +94,7 @@ const NAV_ICONS = (() => {
     plans: w('<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13V22"/>'),
     promo: w('<path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2 2 2 0 0 0 0 6 2 2 0 0 1-2 2H5a2 2 0 0 1-2-2 2 2 0 0 0 0-6z"/><path d="M14 7v10"/>'),
     gifts: w('<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M4 12v9h16v-9M12 8v13"/><path d="M12 8S9.5 3.5 7 4.8 8.5 8 12 8zM12 8s2.5-4.5 5-3.2S15.5 8 12 8z"/>'),
+    promogroups: w('<path d="M20.6 12.6 12 21l-8.6-8.6a3 3 0 0 1 0-4.2l4.2-4.2a3 3 0 0 1 4.2 0l8.8 8.8z"/><circle cx="7.5" cy="7.5" r="1.3"/>'),
     broadcast: w('<path d="M22 2 11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>'),
     tenants: w('<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 21v-4h6v4"/><path d="M8 7h.01M12 7h.01M16 7h.01M8 11h.01M12 11h.01M16 11h.01"/>'),
     brand: w('<circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="10" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="15.5" cy="10" r="1"/><circle cx="10" cy="15" r="1"/>'),
@@ -682,9 +683,11 @@ RENDER.users = async function () {
     + '<div id="u_bulk" style="margin-top:10px"></div>'
     + '<div id="u_list" class="mut" style="margin-top:10px">загрузка…</div><div id="u_pager" class="row" style="margin-top:10px;gap:10px;align-items:center"></div></div><div id="u_card"></div>';
   U_OFFSET = 0; U_SEARCH = ''; U_STATUS = ''; U_SEL.clear(); loadUsers();
+  api('/promo-groups').then((g) => { U_GROUPS = g || []; renderBulkBar(); }).catch(() => {});
 };
 // ── массовый выбор клиентов (bulk) ───────────────────────────────────────────
 let U_SEL = new Set();
+let U_GROUPS = [];
 function toggleSel(id, on) { if (on) U_SEL.add(id); else U_SEL.delete(id); renderBulkBar(); }
 function toggleSelAll(on) { document.querySelectorAll('.u-sel').forEach((cb) => { cb.checked = on; if (on) U_SEL.add(cb.value); else U_SEL.delete(cb.value); }); renderBulkBar(); }
 function clearSel() { U_SEL.clear(); document.querySelectorAll('.u-sel').forEach((cb) => { cb.checked = false; }); const h = document.getElementById('u_selall'); if (h) h.checked = false; renderBulkBar(); }
@@ -697,7 +700,16 @@ function renderBulkBar() {
     + '<button class="btn sm" onclick="bulkAction(\'balance\')">₽ баланс</button>'
     + '<button class="btn bad sm" onclick="bulkAction(\'block\')">🚫 заблокировать</button>'
     + '<button class="btn sec sm" onclick="bulkAction(\'unblock\')">🔓 разблокировать</button>'
+    + (U_GROUPS.length ? `<span class="row" style="gap:6px"><select id="u_grpsel" style="max-width:190px"><option value="">— в промо-группу —</option>${U_GROUPS.map((g) => `<option value="${esc(g.id)}">${esc(g.name)} (−${g.discountPct}%)</option>`).join('')}<option value="__clear__">убрать из группы</option></select><button class="btn sm" onclick="bulkGroup()">🎯 назначить</button></span>` : '')
     + '<button class="btn sec sm" onclick="clearSel()">снять выбор</button></div></div>';
+}
+async function bulkGroup() {
+  const sel = document.getElementById('u_grpsel'); if (!sel) return;
+  let v = sel.value; if (!v) return toast('выберите группу');
+  if (v === '__clear__') v = '';
+  const ids = [...U_SEL]; if (!ids.length) return;
+  toast('применяю…');
+  try { const r = await api('/users/bulk', { method: 'POST', body: JSON.stringify({ action: 'promoGroup', ids, value: v }) }); toast(`готово: ${r.done}`); clearSel(); loadUsers(); } catch (e) { toast(e.message); }
 }
 async function bulkAction(action) {
   const ids = [...U_SEL]; if (!ids.length) return;
@@ -992,6 +1004,33 @@ async function addGift() {
   try { const r = await api('/gifts', { method: 'POST', body: JSON.stringify(body) }); toast('выпущено кодов: ' + (r.length || 0)); RENDER.gifts(); } catch (e) { toast(e.message); }
 }
 async function delGift(id) { if (!confirm('Удалить подарочный код?')) return; try { await api('/gifts/' + id, { method: 'DELETE' }); RENDER.gifts(); } catch (e) { toast(e.message); } }
+
+// ── ПРОМО-ГРУППЫ ─────────────────────────────────────────────────────────────
+RENDER.promogroups = async function () {
+  const el = document.getElementById('tab-promogroups');
+  el.innerHTML = '<div class="card"><b>Новая промо-группа</b>'
+    + '<div class="mut">Сегмент клиентов с фиксированной скидкой на оплату и продление. Клиентов добавляйте во вкладке «Клиенты»: выделите галочками → «🎯 назначить».</div>'
+    + '<div class="row" style="margin-top:8px"><input id="pg_name" placeholder="Название (VIP, Друзья…)" class="grow"><input id="pg_disc" type="number" placeholder="скидка %" style="max-width:120px"></div>'
+    + '<div style="margin-top:8px"><button class="btn" onclick="addPromoGroup()">Создать группу</button></div></div>'
+    + '<div class="card"><b>Промо-группы</b><div id="pg_list" class="mut">загрузка…</div></div>';
+  try {
+    const list = await api('/promo-groups');
+    document.getElementById('pg_list').innerHTML = list.length ? '<table><tr><th>Название</th><th>Скидка</th><th>Клиентов</th><th></th></tr>'
+      + list.map((g) => `<tr><td><b>${esc(g.name)}</b></td><td class="mut">−${g.discountPct}%</td><td class="mut">${g.members}</td><td><button class="btn sec sm" onclick='editPromoGroup(${JSON.stringify(g.id)},${JSON.stringify(g.name)},${g.discountPct})'>изм.</button> <button class="btn bad sm" onclick='delPromoGroup(${JSON.stringify(g.id)})'>×</button></td></tr>`).join('') + '</table>'
+      : '<span class="mut">нет групп</span>';
+  } catch (e) { document.getElementById('pg_list').textContent = e.message; }
+};
+async function addPromoGroup() {
+  const body = { name: document.getElementById('pg_name').value.trim(), discountPct: +document.getElementById('pg_disc').value || 0 };
+  if (!body.name) return toast('укажи название');
+  try { await api('/promo-groups', { method: 'POST', body: JSON.stringify(body) }); toast('группа создана'); RENDER.promogroups(); } catch (e) { toast(e.message); }
+}
+async function editPromoGroup(id, name, disc) {
+  const n = prompt('Название группы:', name); if (n === null) return;
+  const d = prompt('Скидка, %:', disc); if (d === null) return;
+  try { await api('/promo-groups/' + id, { method: 'PATCH', body: JSON.stringify({ name: n, discountPct: Number(d) }) }); toast('сохранено'); RENDER.promogroups(); } catch (e) { toast(e.message); }
+}
+async function delPromoGroup(id) { if (!confirm('Удалить группу? Клиенты останутся без скидки.')) return; try { await api('/promo-groups/' + id, { method: 'DELETE' }); RENDER.promogroups(); } catch (e) { toast(e.message); } }
 
 // ── ПЛАТЁЖКИ ─────────────────────────────────────────────────────────────────
 RENDER.payments = async function () {

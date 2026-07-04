@@ -37,6 +37,7 @@ import { FeaturesModule } from './features/features.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { GiftsModule } from './gifts/gifts.module';
+import { PromoGroupsModule } from './promo-groups/promo-groups.module';
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { GiftsModule } from './gifts/gifts.module';
     OnboardingModule,
     TicketsModule,
     GiftsModule,
+    PromoGroupsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

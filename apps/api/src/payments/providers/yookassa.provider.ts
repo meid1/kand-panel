@@ -1,6 +1,6 @@
 import { httpJson } from './http';
 import {
-  InvoiceRequest, InvoiceResult, PaymentProvider, WebhookResult,
+  InvoiceRequest, InvoiceResult, PaymentProvider, RecurringResult, WebhookResult,
 } from './provider.interface';
 
 /**
@@ -35,6 +35,7 @@ export class YooKassaProvider implements PaymentProvider {
         confirmation: { type: 'redirect', return_url: req.returnUrl || 'https://t.me' },
         description: req.description,
         metadata: { paymentId: req.paymentId },
+        ...(req.saveMethod ? { save_payment_method: true } : {}), // сохранить карту для рекуррента
       }),
     });
     return { url: data.confirmation?.confirmation_url, externalId: data.id };
@@ -52,6 +53,35 @@ export class YooKassaProvider implements PaymentProvider {
     });
     const status = p.status === 'succeeded' ? 'paid'
       : p.status === 'canceled' ? 'failed' : 'pending';
-    return { externalId: id, paymentId: p.metadata?.paymentId, status };
+    // если клиент разрешил сохранение — вернём токен карты для рекуррента
+    let savedMethodId: string | undefined, savedCardTitle: string | undefined;
+    if (status === 'paid' && p.payment_method?.saved && p.payment_method?.id) {
+      savedMethodId = p.payment_method.id;
+      const last4 = p.payment_method.card?.last4;
+      savedCardTitle = last4 ? `•• ${last4}` : 'карта';
+    }
+    return { externalId: id, paymentId: p.metadata?.paymentId, status, savedMethodId, savedCardTitle };
+  }
+
+  /** Рекуррентное списание с сохранённой карты (payment_method_id), без участия клиента. */
+  async chargeRecurring(
+    methodId: string, amount: number, description: string, paymentId: string, cfg: Record<string, string>,
+  ): Promise<RecurringResult> {
+    const data = await httpJson('https://api.yookassa.ru/v3/payments', {
+      method: 'POST',
+      headers: {
+        Authorization: this.auth(cfg),
+        'Idempotence-Key': paymentId,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        amount: { value: amount.toFixed(2), currency: 'RUB' },
+        capture: true,
+        payment_method_id: methodId, // списание с сохранённой карты
+        description,
+        metadata: { paymentId },
+      }),
+    });
+    return { ok: data.status === 'succeeded', externalId: data.id };
   }
 }

@@ -1081,6 +1081,7 @@ RENDER.payments = async function () {
         + `<label class="fld">${esc(p.title)} ${p.enabled ? '<span class="pill ok">вкл</span>' : '<span class="pill">выкл</span>'} <span class="mut">(${(p.kinds || []).join(', ')})</span></label>`
         + `<div class="row"><label class="pill"><input type="checkbox" id="pe_${p.id}" ${p.enabled ? 'checked' : ''} style="width:auto;margin:0 6px 0 0">включить</label></div>`
         + p.requiredKeys.map((k) => `<input id="pk_${p.id}_${k}" placeholder="${esc(k)}">`).join('')
+        + (p.supportsRecurrent ? `<div class="row"><label class="pill" title="Сохранять карту клиента и автопродлевать без его участия"><input type="checkbox" id="pr_${p.id}" ${p.recurrent ? 'checked' : ''} style="width:auto;margin:0 6px 0 0">рекуррент (автосписание с карты)</label></div>` : '')
         + `<button class="btn sm" onclick="savePay('${p.id}', ${JSON.stringify(p.requiredKeys).replace(/"/g, '&quot;')})">Сохранить</button></div>`).join('') + '</div>';
   } catch (e) { el.innerHTML = '<div class="card">' + esc(e.message) + '</div>'; }
 };
@@ -1091,6 +1092,8 @@ async function saveStars() {
 async function savePay(id, keys) {
   const body = { enabled: document.getElementById('pe_' + id).checked };
   keys.forEach((k) => { const v = document.getElementById('pk_' + id + '_' + k).value; if (v) body[k] = v; });
+  const rec = document.getElementById('pr_' + id);
+  if (rec) body.recurrent = rec.checked ? '1' : '0';
   try { await api('/settings/pay/' + id, { method: 'PUT', body: JSON.stringify(body) }); toast('сохранено'); RENDER.payments(); } catch (e) { toast(e.message); }
 }
 

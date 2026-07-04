@@ -60,6 +60,7 @@ model User {
   payments     Payment[]
   bypass       BypassUsage?
   tickets      Ticket[]
+  savedCards   SavedCard[]
   @@unique([tenantId, tgId]) // Phase 0 изоляция: (тенант, tg) = 1 аккаунт
   @@index([tenantId, externalId]) // дедуп при импорте по исходному id
   @@index([promoGroupId])
@@ -74,6 +75,18 @@ model PromoGroup {
   discountPct Int      @default(0) // 0..100
   createdAt   DateTime @default(now())
   users       User[]
+}
+
+/// Сохранённая карта для рекуррента (автосписание). methodId — токен карты у провайдера.
+model SavedCard {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  provider  String   // yookassa
+  methodId  String   // payment_method_id у провайдера
+  title     String?  // маскированная карта (напр. •• 1234)
+  createdAt DateTime @default(now())
+  @@index([userId])
 }
 
 /// UTM-кампания: трекинг воронки переход(клик)→регистрация→оплата по метке.

@@ -17,6 +17,7 @@ export interface InvoiceRequest {
   description: string;
   returnUrl?: string; // куда вернуть клиента после оплаты
   email?: string;
+  saveMethod?: boolean; // сохранить способ оплаты (карту) для рекуррента
 }
 
 export interface InvoiceResult {
@@ -28,6 +29,14 @@ export interface WebhookResult {
   externalId?: string; // id платежа у провайдера (для поиска нашего Payment)
   paymentId?: string; // наш Payment.id, если провайдер вернул его назад
   status: 'paid' | 'failed' | 'pending';
+  savedMethodId?: string; // токен сохранённой карты (если клиент разрешил рекуррент)
+  savedCardTitle?: string; // маскированная карта для показа
+}
+
+/** Результат рекуррентного (автоматического) списания с сохранённой карты. */
+export interface RecurringResult {
+  ok: boolean; // списание прошло
+  externalId?: string; // id платежа у провайдера
 }
 
 export interface PaymentProvider {
@@ -53,4 +62,16 @@ export interface PaymentProvider {
     rawBody: string,
     cfg: Record<string, string>,
   ): Promise<WebhookResult>;
+
+  /**
+   * Рекуррентное списание с ранее сохранённой карты (methodId). Опционально —
+   * поддерживают не все провайдеры. Используется автопродлением (без участия клиента).
+   */
+  chargeRecurring?(
+    methodId: string,
+    amount: number,
+    description: string,
+    paymentId: string,
+    cfg: Record<string, string>,
+  ): Promise<RecurringResult>;
 }

@@ -3,6 +3,7 @@ import { Interval } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { NodeAgentClient } from '../nodes-agent/node-agent.client';
 import { ReconcileService } from '../reconcile/reconcile.service';
+import { PaymentsService } from '../payments/payments.service';
 
 const AGENT_PORT = 8443;
 const DAY = 86400_000;
@@ -20,6 +21,7 @@ export class MonitoringService {
     private prisma: PrismaService,
     private agent: NodeAgentClient,
     private reconcile: ReconcileService,
+    private payments: PaymentsService,
   ) {}
 
   private async setting(key: string): Promise<string> {
@@ -110,6 +112,16 @@ export class MonitoringService {
     const plan = u.autoRenewPlanId
       ? await this.prisma.plan.findUnique({ where: { id: u.autoRenewPlanId } }) : null;
     if (!plan || !plan.isActive) return null;
+    // 1) автосписание с сохранённой карты (рекуррент) — если карта есть и провайдер поддерживает
+    const byCard = await this.payments.chargeSavedCard(u.id, u.autoRenewPlanId!).catch(() => null);
+    if (byCard?.ok) {
+      await this.prisma.user.update({ where: { id: u.id }, data: { isTrial: false, remindStage: 0 } });
+      await this.notify(token, u.tgId.toString(),
+        `✅ Автопродление ${brand}: списано с карты, тариф «${plan.title}» продлён.`);
+      const fresh = await this.prisma.user.findUnique({ where: { id: u.id }, select: { expireAt: true } });
+      return fresh?.expireAt ? Math.ceil((fresh.expireAt.getTime() - Date.now()) / DAY) : 1;
+    }
+    // 2) с баланса (как раньше)
     const price = Number(plan.price);
     if (Number(u.balance) < price) {
       // не хватило — один раз подскажем пополнить (используем стадию напоминания)

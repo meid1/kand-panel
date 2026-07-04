@@ -69,6 +69,8 @@ export class PaymentsService {
           currency: dto.currency || 'RUB',
           description: description || `Подписка ${days} дн.`,
           returnUrl: dto.returnUrl,
+          // сохранить карту для автосписания, если рекуррент включён (только за подписку, не пополнение)
+          saveMethod: !dto.topup && (await this.recurrentEnabled(dto.provider)),
         },
         cfg,
       );
@@ -110,6 +112,8 @@ export class PaymentsService {
         data: { status: 'paid', paidAt: new Date() },
       });
       if (flip.count === 0) return { ok: true, note: 'уже оплачен (гонка)' };
+      // сохранить карту для рекуррента, если провайдер вернул токен
+      if (res.savedMethodId) await this.storeSavedCard(payment.userId, providerId, res.savedMethodId, res.savedCardTitle);
       if (payment.topup) {
         // пополнение баланса
         await this.prisma.user.update({ where: { id: payment.userId }, data: { balance: { increment: payment.amount } } });
@@ -206,6 +210,8 @@ export class PaymentsService {
       out.push({
         id: p.id, title: p.title, kinds: p.kinds,
         requiredKeys: p.requiredKeys, enabled: await this.registry.isEnabled(p.id),
+        supportsRecurrent: typeof (p as any).chargeRecurring === 'function', // автосписание с карты
+        recurrent: (await this.setting(`pay.${p.id}.recurrent`)) === '1',
       });
     }
     return out;
@@ -260,5 +266,58 @@ export class PaymentsService {
     await this.referral.rewardOnFirstPayment(payment.userId);
     this.log.log(`оплата ${payment.id} (stars) → +${payment.days} дн.`);
     return { ok: true, days: payment.days };
+  }
+
+  // ── Рекуррент / сохранённые карты (автосписание) ────────────────────────────
+  /** Включён ли рекуррент у провайдера (сохранять карту при оплате). По умолчанию нет. */
+  async recurrentEnabled(provider: string): Promise<boolean> {
+    return (await this.setting(`pay.${provider}.recurrent`)) === '1';
+  }
+
+  /** Сохранить карту клиента (одна активная на юзера+провайдер). */
+  private async storeSavedCard(userId: string, provider: string, methodId: string, title?: string) {
+    const exists = await this.prisma.savedCard.findFirst({ where: { userId, provider, methodId } });
+    if (exists) return;
+    await this.prisma.savedCard.deleteMany({ where: { userId, provider } }); // заменяем старую
+    await this.prisma.savedCard.create({ data: { userId, provider, methodId, title: title || null } });
+    this.log.log(`карта сохранена для рекуррента: user ${userId} (${provider})`);
+  }
+
+  /** Есть ли у клиента сохранённая карта (для автопродления). */
+  async hasSavedCard(userId: string): Promise<boolean> {
+    return (await this.prisma.savedCard.count({ where: { userId } })) > 0;
+  }
+
+  /**
+   * Автосписание с сохранённой карты под тариф (для автопродления в мониторинге).
+   * Возвращает {ok, days} при успехе, иначе null (нет карты/провайдер выкл/отказ).
+   */
+  async chargeSavedCard(userId: string, planId: string) {
+    const card = await this.prisma.savedCard.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } });
+    if (!card) return null;
+    const provider = this.registry.get(card.provider);
+    if (!provider?.chargeRecurring || !(await this.registry.isEnabled(card.provider))) return null;
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const plan = await this.plans.get(planId);
+    if (!user || !plan) return null;
+    const pct = await this.promoGroups.discountPctForUser(user);
+    const price = this.promoGroups.applyDiscount(Number(plan.price), pct);
+    const cfg = await this.registry.configFor(card.provider);
+    const payment = await this.prisma.payment.create({
+      data: { tenantId: user.tenantId, userId, amount: price, method: `${card.provider}-auto`, days: plan.days, status: 'pending', description: `Автопродление: ${plan.title}` },
+    });
+    try {
+      const r = await provider.chargeRecurring!(card.methodId, price, `Автопродление: ${plan.title}`, payment.id, cfg);
+      if (!r.ok) { await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'failed' } }); return null; }
+      await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'paid', paidAt: new Date(), invoiceId: r.externalId } });
+      await this.users.grantDays(userId, plan.days);
+      await this.referral.rewardOnFirstPayment(userId);
+      this.log.log(`автосписание с карты: user ${userId} → +${plan.days} дн. (${price}₽)`);
+      return { ok: true, days: plan.days };
+    } catch (e: any) {
+      await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'failed' } }).catch(() => {});
+      this.log.warn(`автосписание с карты не удалось (user ${userId}): ${e?.message || e}`);
+      return null;
+    }
   }
 }

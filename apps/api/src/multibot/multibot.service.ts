@@ -77,7 +77,8 @@ export class MultibotService implements OnModuleInit {
           await this.prisma.tenant.update({ where: { id: f.id }, data: { botUsername: me.result.username } });
         }
       } catch { /* getMe не критичен */ }
-      this.loop(ctx).catch((e) => this.log.warn(`франшиза-бот ${f.brand} упал: ${e.message || e}`));
+      // при краше loop удаляем бота из карты, чтобы следующий sync его ПЕРЕЗАПУСТИЛ (иначе молча умирает)
+      this.loop(ctx).catch((e) => { this.log.warn(`франшиза-бот ${f.brand} упал: ${e.message || e}`); this.bots.delete(token); });
       this.log.log(`франшиза-бот запущен: ${f.brand} (@${ctx.username || '?'})`);
     }
     // остановить боты снятых/выключенных франшиз
@@ -131,7 +132,8 @@ export class MultibotService implements OnModuleInit {
 
   private async onMessage(ctx: BotCtx, msg: any) {
     const from = msg.from;
-    const key = `${ctx.token}:${msg.chat.id}`;
+    if (!from || typeof msg.text !== 'string') return; // нетекстовые/служебные — игнор
+    const key = `${ctx.token}:${msg.chat.id}:${from.id}`; // изоляция FSM по пользователю (важно в группах)
     const { user, isNew } = await this.users.ensure(
       from.id, { username: from.username, name: [from.first_name, from.last_name].filter(Boolean).join(' ') }, ctx.tenantId,
     );
@@ -166,11 +168,13 @@ export class MultibotService implements OnModuleInit {
     if (data.startsWith('plan:')) return this.sendPayMethods(ctx, chatId, data.slice(5), user);
     if (data.startsWith('pay:')) { const [, planId, provider] = data.split(':'); return this.createInvoice(ctx, chatId, user, provider, planId); }
     if (data.startsWith('bal:')) {
-      try { const r = await this.payments.payWithBalance(user.id, data.slice(4)); return tg.sendMessage(ctx.token, chatId, `✅ Оплачено с баланса: +${r.days} дн. Остаток: ${r.balance}₽`, this.menu()); }
+      const planId = data.slice(4);
+      if (!(await this.planFor(ctx, planId))) return tg.sendMessage(ctx.token, chatId, '❌ Тариф не найден');
+      try { const r = await this.payments.payWithBalance(user.id, planId); return tg.sendMessage(ctx.token, chatId, `✅ Оплачено с баланса: +${r.days} дн. Остаток: ${r.balance}₽`, this.menu()); }
       catch (e: any) { return tg.sendMessage(ctx.token, chatId, `❌ ${e.message}`, this.menu()); }
     }
     if (data === 'referral') return this.sendReferral(ctx, chatId, user);
-    if (data === 'promo') { this.awaitingPromo.add(`${ctx.token}:${chatId}`); return tg.sendMessage(ctx.token, chatId, '🎟 Пришлите промокод одним сообщением:'); }
+    if (data === 'promo') { this.awaitingPromo.add(`${ctx.token}:${chatId}:${cb.from.id}`); return tg.sendMessage(ctx.token, chatId, '🎟 Пришлите промокод одним сообщением:'); }
   }
 
   private async sendSubscription(ctx: BotCtx, chatId: number, user: any) {
@@ -221,10 +225,19 @@ export class MultibotService implements OnModuleInit {
     await tg.sendMessage(ctx.token, chatId, 'Способ оплаты:', buttons);
   }
 
+  // тариф, ДОСТУПНЫЙ этой франшизе (платформенный tenantId=null или свой) — против оплаты чужого тарифа
+  private async planFor(ctx: BotCtx, planId: string) {
+    const p = await this.plans.get(planId);
+    if (!p) return null;
+    if (p.tenantId && p.tenantId !== ctx.tenantId) return null;
+    return p;
+  }
+
   private async sendPayMethods(ctx: BotCtx, chatId: number, planId: string, user: any) {
+    const plan = await this.planFor(ctx, planId);
+    if (!plan) return tg.sendMessage(ctx.token, chatId, '❌ Тариф не найден');
     const methods = await this.payments.available();
     const buttons: InlineButton[][] = methods.map((m) => [{ text: m.title, callback_data: `pay:${planId}:${m.id}` }]);
-    const plan = await this.plans.get(planId);
     if (plan && Number(user.balance || 0) >= Number(plan.price)) {
       buttons.unshift([{ text: `💰 С баланса (${Number(user.balance)}₽)`, callback_data: `bal:${planId}` }]);
     }
@@ -242,9 +255,10 @@ export class MultibotService implements OnModuleInit {
     try {
       let inv: any, label: string;
       if (planId) {
+        const plan = await this.planFor(ctx, planId);
+        if (!plan) return tg.sendMessage(ctx.token, chatId, '❌ Тариф не найден');
         inv = await this.payments.createInvoice({ userId: user.id, provider, planId } as any);
-        const plan = await this.plans.get(planId);
-        label = `Оплата ${Number(plan?.price)}₽ — ${plan?.title}:`;
+        label = `Оплата ${Number(plan.price)}₽ — ${plan.title}:`;
       } else {
         const daysS = await this.prisma.setting.findUnique({ where: { key: 'plan.days' } });
         const priceS = await this.prisma.setting.findUnique({ where: { key: 'plan.price' } });

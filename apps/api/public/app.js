@@ -19,9 +19,18 @@ async function api(path, opts = {}) {
   });
   if (r.status === 401) { logout(); throw new Error('нужен вход'); }
   const txt = await r.text();
-  const data = txt ? JSON.parse(txt) : {};
+  let data;
+  try { data = txt ? JSON.parse(txt) : {}; }
+  catch { throw new Error(r.ok ? 'сервер вернул не JSON' : ('HTTP ' + r.status + ' — сервис недоступен')); }
   if (!r.ok) throw new Error(data.message || ('HTTP ' + r.status));
   return data;
+}
+// лёгкий синк дедуплицируется: параллельные вызовы (переключение вкладок/поиск) переиспользуют один запрос
+let _syncLightP = null;
+function syncLight() {
+  if (_syncLightP) return _syncLightP;
+  _syncLightP = api('/sync/light', { method: 'POST' }).catch(() => {}).finally(() => { _syncLightP = null; });
+  return _syncLightP;
 }
 function toast(msg) {
   const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
@@ -167,14 +176,17 @@ RENDER.dashboard = async function () {
   const el = document.getElementById('tab-dashboard');
   el.innerHTML = '<div class="mut">загрузка…</div>';
   try {
-    await api('/sync/light', { method: 'POST' }).catch(() => {}); // догнать свежие оплаты перед показом
+    await syncLight(); // догнать свежие оплаты (дедуп)
     const s = await api('/dashboard/summary');
     const money = (v) => Number(v).toLocaleString('ru-RU') + '₽';
     const h = s.health || {}, f = s.funnel || {};
+    if (!s.chart) s.chart = [];
     const pct = (a, b) => (b ? Math.round(a / b * 100) : 0);
-    const mom = (h.momPct >= 0)
-      ? `<span class="pill ok">▲ +${h.momPct}% выручка к пред. мес.</span>`
-      : `<span class="pill bad">▼ ${h.momPct}% выручка к пред. мес.</span>`;
+    const mom = (h.momPct == null)
+      ? '<span class="pill">выручка к пред. мес.: —</span>'
+      : (h.momPct >= 0
+        ? `<span class="pill ok">▲ +${h.momPct}% выручка к пред. мес.</span>`
+        : `<span class="pill bad">▼ ${h.momPct}% выручка к пред. мес.</span>`);
     el.innerHTML =
       `<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><b style="font-size:17px">Здоровье бизнеса</b><span class="row" style="gap:8px" id="sync_box">${mom}</span></div>`
       + '<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:14px">'
@@ -223,7 +235,8 @@ RENDER.dashboard = async function () {
 };
 // индикатор свежести данных (синк из БД бота) + ручной запуск
 async function loadSyncStatus() {
-  const box = document.getElementById('sync_box'); if (!box) return;
+  const box = document.getElementById('sync_box'); if (!box || box.dataset.synced) return;
+  box.dataset.synced = '1'; // не дублировать кнопки при повторном вызове
   try {
     const s = await api('/sync/status');
     if (!s.enabled) return; // синк не настроен — ничего не показываем
@@ -592,7 +605,7 @@ function pageUsers(d) { U_OFFSET = Math.max(0, U_OFFSET + d * U_PAGE); loadUsers
 async function loadUsers() {
   const list = document.getElementById('u_list'); if (!list) return;
   try {
-    await api('/sync/light', { method: 'POST' }).catch(() => {}); // догнать свежие оплаты/продления
+    await syncLight(); // догнать свежие оплаты (дедуп)
     const q = new URLSearchParams({ limit: U_PAGE, offset: U_OFFSET });
     if (U_SEARCH) q.set('search', U_SEARCH);
     if (U_STATUS) q.set('status', U_STATUS);

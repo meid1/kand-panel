@@ -7,6 +7,7 @@ async function call(token: string, method: string, params: any): Promise<any> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
+    signal: AbortSignal.timeout(15_000), // жёсткий HTTP-таймаут: не блокируем воркер при зависшем TCP
   });
   return r.json();
 }
@@ -15,7 +16,8 @@ export interface InlineButton { text: string; callback_data?: string; url?: stri
 
 export const tg = {
   async getUpdates(token: string, offset: number, timeout = 25) {
-    const r = await fetch(`${base(token)}/getUpdates?offset=${offset}&timeout=${timeout}`);
+    // long-poll: HTTP-таймаут = poll-таймаут + запас, чтобы не висеть вечно при обрыве сети
+    const r = await fetch(`${base(token)}/getUpdates?offset=${offset}&timeout=${timeout}`, { signal: AbortSignal.timeout((timeout + 10) * 1000) });
     const j = await r.json();
     return j.ok ? j.result : [];
   },

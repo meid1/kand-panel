@@ -132,10 +132,22 @@ export class PaymentsService {
     if (!plan) throw new BadRequestException('тариф не найден');
     const price = Number(plan.price);
     if (Number(user.balance) < price) throw new BadRequestException('недостаточно средств на балансе');
-    await this.prisma.user.update({ where: { id: userId }, data: { balance: { decrement: price } } });
-    await this.users.grantDays(userId, plan.days);
+    // АТОМАРНОЕ списание: updateMany с условием balance>=price исключает гонку двойного
+    // нажатия (два параллельных запроса не спишут дважды). count===0 → уже/недостаточно.
+    const dec = await this.prisma.user.updateMany({
+      where: { id: userId, balance: { gte: price } }, data: { balance: { decrement: price } },
+    });
+    if (dec.count === 0) throw new BadRequestException('недостаточно средств на балансе');
+    // grantDays идёт во внешнюю БД/мост — если упадёт, компенсируем баланс (без потери денег).
+    try {
+      await this.users.grantDays(userId, plan.days);
+    } catch (e) {
+      await this.prisma.user.update({ where: { id: userId }, data: { balance: { increment: price } } });
+      throw e;
+    }
     await this.referral.rewardOnFirstPayment(userId);
-    return { ok: true, days: plan.days, balance: Number(user.balance) - price };
+    const fresh = await this.prisma.user.findUnique({ where: { id: userId }, select: { balance: true } });
+    return { ok: true, days: plan.days, balance: Number(fresh?.balance ?? 0) };
   }
 
   async list(opts: { tenantId?: string; search?: string; status?: string; limit?: number; offset?: number } = {}) {

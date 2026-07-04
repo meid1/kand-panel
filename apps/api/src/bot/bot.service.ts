@@ -190,7 +190,10 @@ export class BotService implements OnModuleInit {
 
   private async onMessage(msg: any) {
     const from = msg.from;
+    if (!from) return;
     const { user, isNew } = await this.users.ensure(from.id, { username: from.username, name: [from.first_name, from.last_name].filter(Boolean).join(' ') });
+    // нетекстовые сообщения (стикер/фото/пересылка) — просто показываем меню, без падений на msg.text
+    if (typeof msg.text !== 'string') { await tg.sendMessage(this.token, msg.chat.id, await this.subst('Меню {brand}:'), await this.menu()); return; }
     // режим ввода: промокод (любой юзер) или owner (приветствие/рассылка)
     if (this.awaiting.has(msg.chat.id)) {
       const st = this.awaiting.get(msg.chat.id);
@@ -296,6 +299,7 @@ export class BotService implements OnModuleInit {
 
   // ── экраны ──────────────────────────────────────────────────────────────────
   private async sendSubscription(chatId: number, user: any) {
+    if (user.isBlocked) return tg.sendMessage(this.token, chatId, '⛔ Доступ заблокирован. Обратитесь в поддержку.');
     let device = (await this.devices.listForUser(user.id))[0];
     if (!device) device = await this.devices.create(user.id, 'Основное');
     const base = this.panelUrl();

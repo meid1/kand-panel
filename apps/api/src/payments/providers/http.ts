@@ -7,6 +7,7 @@ export async function httpJson(
     method: opts.method || 'GET',
     headers: opts.headers,
     body: opts.body,
+    signal: AbortSignal.timeout(15_000), // зависший платёжный API не должен блокировать воркер
   });
   const text = await res.text();
   let data: any;

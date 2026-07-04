@@ -58,7 +58,11 @@ export class ReferralService {
   async rewardOnFirstPayment(userId: string): Promise<void> {
     const u = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!u || u.refFirstPay || !u.referrerId) return;
-    await this.prisma.user.update({ where: { id: userId }, data: { refFirstPay: true } });
+    // АТОМАРНАЯ пометка: только один параллельный вебхук выиграет гонку и начислит бонус.
+    const claim = await this.prisma.user.updateMany({
+      where: { id: userId, refFirstPay: false }, data: { refFirstPay: true },
+    });
+    if (claim.count === 0) return; // уже награждён другим запросом
     const rewardDays = await this.setting('referral.reward_days', 0);
     if (rewardDays > 0) {
       await this.users.grantDays(u.referrerId, rewardDays);

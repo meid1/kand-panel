@@ -1,0 +1,19 @@
+[Unit]
+Description=Kand installer (Установить за меня — удалённая установка панели по SSH)
+After=network.target
+
+[Service]
+Type=simple
+# путь к репозиторию с install.sh; INSTALL_SH по умолчанию берётся рядом (../install.sh)
+WorkingDirectory=/opt/kand-landing/installer
+Environment=PORT=8091
+Environment=INSTALL_SH=/opt/kand-landing/install.sh
+ExecStart=/usr/bin/node /opt/kand-landing/installer/server.mjs
+Restart=always
+RestartSec=3
+# безопасность процесса
+NoNewPrivileges=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

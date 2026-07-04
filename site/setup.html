@@ -86,6 +86,21 @@
     </div>
     <div class="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><div>После установки команда выведет адрес панели, логин и пароль. Нет своего сервера или хотите «под ключ»? Напишите <a href="https://t.me/marius_support">@marius_support</a> — поможем бесплатно.</div></div>
   </div>
+
+  <div class="out" style="margin-top:16px">
+    <div class="cmd" style="display:block">
+      <div class="lbl">…или установим за вас — введите доступ к серверу (чистый Ubuntu/Debian), опции берём из выбора выше</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <input id="s_ip" placeholder="IP сервера" style="flex:1;min-width:150px;padding:10px;border-radius:8px;border:1px solid #2a3550;background:#0e1526;color:#e6edf7">
+        <input id="s_user" placeholder="логин" value="root" style="width:110px;padding:10px;border-radius:8px;border:1px solid #2a3550;background:#0e1526;color:#e6edf7">
+        <input id="s_pass" type="password" placeholder="пароль сервера" style="flex:1;min-width:150px;padding:10px;border-radius:8px;border:1px solid #2a3550;background:#0e1526;color:#e6edf7">
+        <button class="cp" style="position:static" onclick="installForMe()" id="s_btn">Установить</button>
+      </div>
+      <pre id="s_log" style="display:none;margin-top:10px;max-height:280px;overflow:auto;background:#0a0f1c;border:1px solid #1c2740;border-radius:8px;padding:12px;font-size:12px;line-height:1.5;white-space:pre-wrap;color:#b9c6db"></pre>
+      <div id="s_result" style="display:none;margin-top:10px;padding:12px;border-radius:8px;background:#0d2a1a;border:1px solid #1c5638;color:#d7f5e4"></div>
+      <div style="font-size:12px;opacity:.7;margin-top:10px">🔒 Пароль используется один раз для установки и <b>нигде не сохраняется</b>. Установка занимает несколько минут.</div>
+    </div>
+  </div>
 </div>
 <div class="toast" id="toast">Скопировано</div>
 
@@ -135,6 +150,57 @@ function copyCmd(){const t=document.getElementById('cmd').textContent;navigator.
 // вставить галочку в первый (HTTPS) опт, отрисованный статически
 document.querySelector('.opt[data-flag="https"] .box').innerHTML = chk;
 build();
+
+// ── «Установить за меня» ─────────────────────────────────────────────────────
+const INSTALLER = 'https://kandpanel.com';
+function gatherOpts(){
+  const domain = document.getElementById('domain').value.trim();
+  const https = document.querySelector('.opt[data-flag="https"]').classList.contains('on');
+  const protos = sel('protos'), feats = sel('features');
+  const offByDefault = FEATURES.filter(f=>!f.on).map(f=>f.id);
+  const disable = FEATURES.map(f=>f.id).filter(id=>!feats.includes(id) && !offByDefault.includes(id));
+  const enable = feats.filter(id=>offByDefault.includes(id));
+  return {
+    domain: domain||undefined,
+    https: !!(domain && https),
+    protocols: (protos.length && protos.length!==PROTOS.length) ? protos : undefined,
+    disable: disable.length ? disable : undefined,
+    enable: enable.length ? enable : undefined,
+  };
+}
+let pollTimer=null;
+async function installForMe(){
+  const server=document.getElementById('s_ip').value.trim();
+  const user=document.getElementById('s_user').value.trim()||'root';
+  const password=document.getElementById('s_pass').value;
+  if(!server||!password){alert('Введите IP и пароль сервера');return;}
+  const log=document.getElementById('s_log'), result=document.getElementById('s_result'), btn=document.getElementById('s_btn');
+  log.style.display='block'; result.style.display='none'; log.textContent='▶ Запускаю установку…'; btn.disabled=true;
+  try{
+    const r=await fetch(INSTALLER+'/api/install',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({server,user,password,...gatherOpts()})});
+    const j=await r.json();
+    if(!r.ok){log.textContent='❌ '+(j.error||'ошибка'); btn.disabled=false; return;}
+    document.getElementById('s_pass').value=''; // не держим пароль в поле
+    poll(j.jobId, log, result, btn);
+  }catch(e){log.textContent='❌ Сервис установки недоступен: '+e.message; btn.disabled=false;}
+}
+function poll(id, log, result, btn){
+  clearInterval(pollTimer);
+  pollTimer=setInterval(async()=>{
+    try{
+      const r=await fetch(INSTALLER+'/api/install/'+id); const j=await r.json();
+      if(j.log){ log.textContent=j.log; log.scrollTop=log.scrollHeight; }
+      if(j.status!=='running'){
+        clearInterval(pollTimer); btn.disabled=false;
+        if(j.status==='done' && j.result){
+          result.style.display='block';
+          const R=j.result;
+          result.innerHTML='<b>✅ Панель установлена!</b><br>Адрес: '+(R.panelUrl?'<a href="'+R.panelUrl+'" target="_blank" style="color:#7ef0b4">'+R.panelUrl+'</a>':'—')+'<br>Логин: <code>'+(R.login||'admin')+'</code>'+(R.password?'<br>Пароль: <code>'+R.password+'</code>':'');
+        }
+      }
+    }catch(e){/* повторим на следующем тике */}
+  }, 2500);
+}
 </script>
 </body>
 </html>

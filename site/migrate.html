@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kand — переезд с другой панели</title>
+<style>
+  :root { --acc:#22D3EE; --bg:#0a0f1c; --panel:#111a2e; --line:#22314f; --txt:#e6edf7; --mut:#8b9bb4; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:15px/1.5 Inter,system-ui,sans-serif; }
+  .wrap { max-width:720px; margin:0 auto; padding:32px 18px 60px; }
+  h1 { font-size:26px; margin:0 0 6px; }
+  .lead { color:#9fb0c9; margin:0 0 22px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px; margin-bottom:16px; }
+  label { display:block; font-size:13px; color:#9fb0c9; margin:12px 0 5px; }
+  input, select { width:100%; padding:11px; border-radius:9px; border:1px solid var(--line); background:#0e1526; color:var(--txt); font-size:14px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > * { flex:1; min-width:150px; }
+  .btn { background:var(--acc); color:#04222a; border:0; border-radius:10px; padding:13px 22px; font-weight:700; font-size:15px; cursor:pointer; margin-top:16px; }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .hint { font-size:12px; color:#7d8ba5; margin-top:8px; }
+  pre { display:none; margin-top:14px; max-height:300px; overflow:auto; background:#070b15; border:1px solid var(--line); border-radius:9px; padding:12px; font-size:12.5px; line-height:1.55; white-space:pre-wrap; color:#b9c6db; }
+  .ok { display:none; margin-top:14px; padding:14px; border-radius:10px; background:#0d2a1a; border:1px solid #1c5638; color:#d7f5e4; }
+  .hidden { display:none; }
+  a { color:var(--acc); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Переезд на Kand</h1>
+  <p class="lead">Перенесём ваших клиентов с 3x-ui, Marzban или Remnawave — с бэкапом и <b>сохранением ссылок</b> (клиентам не надо ничего переустанавливать). Панель Kand уже должна быть установлена.</p>
+
+  <div class="card">
+    <label>Откуда переезжаем</label>
+    <select id="src" onchange="onSrc()">
+      <option value="3x-ui">3x-ui</option>
+      <option value="marzban">Marzban</option>
+      <option value="remnawave">Remnawave</option>
+    </select>
+
+    <div id="marzEngine" class="hidden">
+      <label>Тип базы Marzban</label>
+      <select id="engine" onchange="onSrc()">
+        <option value="sqlite">SQLite (по умолчанию)</option>
+        <option value="mysql">MySQL / MariaDB</option>
+        <option value="postgres">PostgreSQL</option>
+      </select>
+    </div>
+
+    <!-- доступ к серверу источника (для SQLite: 3x-ui, marzban-sqlite) -->
+    <div id="serverBlock">
+      <label>Сервер старой панели — доступ по SSH</label>
+      <div class="row">
+        <input id="server" placeholder="IP сервера">
+        <input id="user" placeholder="логин" value="root" style="max-width:110px">
+        <input id="password" type="password" placeholder="пароль">
+      </div>
+      <label>Путь к базе на сервере</label>
+      <input id="dbPath" placeholder="/etc/x-ui/x-ui.db">
+    </div>
+
+    <!-- строка подключения к БД (marzban mysql/pg, remnawave) -->
+    <div id="connBlock" class="hidden">
+      <label>Строка подключения к базе</label>
+      <input id="conn" placeholder="postgresql://user:pass@host:5432/db">
+      <div class="hint">База должна быть доступна снаружи (или откройте доступ на время переезда).</div>
+    </div>
+
+    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+
+    <label>Новая панель Kand — адрес и пароль админки</label>
+    <div class="row">
+      <input id="targetUrl" placeholder="https://ваша-панель.com (или http://IP:3000)">
+      <input id="targetPassword" type="password" placeholder="пароль админки Kand">
+    </div>
+
+    <button class="btn" id="go" onclick="migrate()">Перенести клиентов</button>
+    <div class="hint">🔒 Пароли используются один раз и <b>нигде не сохраняются</b>. Сначала делается бэкап базы источника.</div>
+
+    <pre id="log"></pre>
+    <div class="ok" id="ok"></div>
+  </div>
+  <p class="hint">Вопросы по переезду — <a href="https://t.me/marius_support">@marius_support</a>.</p>
+</div>
+
+<script>
+const INSTALLER = 'https://kandpanel.com';
+const DB_DEFAULTS = { '3x-ui': '/etc/x-ui/x-ui.db', 'marzban': '/var/lib/marzban/db.sqlite3' };
+function onSrc() {
+  const src = document.getElementById('src').value;
+  const engine = document.getElementById('engine').value;
+  document.getElementById('marzEngine').classList.toggle('hidden', src !== 'marzban');
+  // conn-режим: remnawave всегда; marzban при mysql/postgres
+  const connMode = src === 'remnawave' || (src === 'marzban' && engine !== 'sqlite');
+  document.getElementById('serverBlock').classList.toggle('hidden', connMode);
+  document.getElementById('connBlock').classList.toggle('hidden', !connMode);
+  if (!connMode) document.getElementById('dbPath').placeholder = DB_DEFAULTS[src] || '/path/to/db';
+  if (src === 'remnawave') document.getElementById('conn').placeholder = 'postgresql://user:pass@host:5432/remnawave';
+}
+let poll = null;
+async function migrate() {
+  const src = document.getElementById('src').value;
+  const engine = document.getElementById('engine').value;
+  const connMode = src === 'remnawave' || (src === 'marzban' && engine !== 'sqlite');
+  const body = {
+    sourceType: src,
+    targetUrl: document.getElementById('targetUrl').value.trim(),
+    targetPassword: document.getElementById('targetPassword').value,
+  };
+  if (src === 'marzban') body.engine = engine;
+  if (connMode) {
+    body.conn = document.getElementById('conn').value.trim();
+    if (!body.conn) return alert('Введите строку подключения к базе');
+  } else {
+    body.server = document.getElementById('server').value.trim();
+    body.user = document.getElementById('user').value.trim() || 'root';
+    body.password = document.getElementById('password').value;
+    body.dbPath = document.getElementById('dbPath').value.trim() || DB_DEFAULTS[src];
+    if (!body.server || !body.password) return alert('Введите IP и пароль сервера источника');
+  }
+  if (!body.targetUrl || !body.targetPassword) return alert('Введите адрес и пароль новой панели Kand');
+  const log = document.getElementById('log'), ok = document.getElementById('ok'), go = document.getElementById('go');
+  log.style.display = 'block'; ok.style.display = 'none'; log.textContent = '▶ Запускаю перенос…'; go.disabled = true;
+  try {
+    const r = await fetch(INSTALLER + '/api/migrate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok) { log.textContent = '❌ ' + (j.error || 'ошибка'); go.disabled = false; return; }
+    document.getElementById('password').value = ''; document.getElementById('targetPassword').value = '';
+    watch(j.jobId, log, ok, go);
+  } catch (e) { log.textContent = '❌ Сервис переезда недоступен: ' + e.message; go.disabled = false; }
+}
+function watch(id, log, ok, go) {
+  clearInterval(poll);
+  poll = setInterval(async () => {
+    try {
+      const r = await fetch(INSTALLER + '/api/migrate/' + id); const j = await r.json();
+      if (j.log) { log.textContent = j.log; log.scrollTop = log.scrollHeight; }
+      if (j.status !== 'running') {
+        clearInterval(poll); go.disabled = false;
+        if (j.status === 'done' && j.result) {
+          ok.style.display = 'block';
+          ok.innerHTML = '<b>✅ Перенос завершён!</b><br>Клиентов в новой панели: <b>' + j.result.imported + '</b>'
+            + (j.result.linksPreserved ? '<br>🔗 Ссылки клиентов сохранены — приложения продолжат работать.' : '<br>ℹ️ Клиентам выданы новые ссылки подписки.');
+        }
+      }
+    } catch (e) { /* повтор */ }
+  }, 2500);
+}
+onSrc();
+</script>
+</body>
+</html>

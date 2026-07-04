@@ -1,7 +1,14 @@
-# Kand installer — «Установить за меня»
+# Kand installer — «Установить за меня» + переезд с других панелей
 
-Маленький сервис, который по запросу с сайта (`setup.html`) заходит на сервер клиента
-по SSH и запускает `install.sh` с выбранными опциями, стримя лог обратно.
+Маленький сервис, который по запросу с сайта заходит на сервер клиента по SSH:
+- `setup.html` → `POST /api/install` — устанавливает Kand с выбранными опциями;
+- `migrate.html` → `POST /api/migrate` — переносит клиентов с 3x-ui / Marzban / Remnawave
+  в уже установленный Kand (бэкап базы источника → извлечение `tools/extract.mjs` →
+  импорт в целевую панель через её `/api/import`; ссылки 3x-ui/Remnawave сохраняются).
+
+Оба стримят лог: `GET /api/install/:id` и `GET /api/migrate/:id`.
+Для миграции SQLite-источников (3x-ui, marzban-sqlite) нужен `better-sqlite3`, для
+mysql/postgres — `mysql2`/`pg` (ставятся по нужде на сервере установщика).
 
 ## Безопасность
 - Пароль сервера клиента — **только в оперативной памяти** на время установки. Не пишется
@@ -19,7 +26,7 @@ PORT=8091 INSTALL_SH=/opt/kand-landing/install.sh node server.mjs
 
 ## nginx (на kandpanel.com)
 ```
-location /api/install {
+location /api/ {           # /api/install*, /api/migrate*
   proxy_pass http://127.0.0.1:8091;
   proxy_read_timeout 1200s;
   proxy_buffering off;

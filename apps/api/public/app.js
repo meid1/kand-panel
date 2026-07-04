@@ -95,6 +95,7 @@ const NAV_ICONS = (() => {
     promo: w('<path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2 2 2 0 0 0 0 6 2 2 0 0 1-2 2H5a2 2 0 0 1-2-2 2 2 0 0 0 0-6z"/><path d="M14 7v10"/>'),
     gifts: w('<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M4 12v9h16v-9M12 8v13"/><path d="M12 8S9.5 3.5 7 4.8 8.5 8 12 8zM12 8s2.5-4.5 5-3.2S15.5 8 12 8z"/>'),
     promogroups: w('<path d="M20.6 12.6 12 21l-8.6-8.6a3 3 0 0 1 0-4.2l4.2-4.2a3 3 0 0 1 4.2 0l8.8 8.8z"/><circle cx="7.5" cy="7.5" r="1.3"/>'),
+    campaigns: w('<path d="M3 11v2a1 1 0 0 0 1 1h3l4 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M15.5 8.5a4 4 0 0 1 0 7"/><path d="M18 6a7 7 0 0 1 0 12"/>'),
     broadcast: w('<path d="M22 2 11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>'),
     tenants: w('<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 21v-4h6v4"/><path d="M8 7h.01M12 7h.01M16 7h.01M8 11h.01M12 11h.01M16 11h.01"/>'),
     brand: w('<circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="10" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="15.5" cy="10" r="1"/><circle cx="10" cy="15" r="1"/>'),
@@ -1031,6 +1032,37 @@ async function editPromoGroup(id, name, disc) {
   try { await api('/promo-groups/' + id, { method: 'PATCH', body: JSON.stringify({ name: n, discountPct: Number(d) }) }); toast('сохранено'); RENDER.promogroups(); } catch (e) { toast(e.message); }
 }
 async function delPromoGroup(id) { if (!confirm('Удалить группу? Клиенты останутся без скидки.')) return; try { await api('/promo-groups/' + id, { method: 'DELETE' }); RENDER.promogroups(); } catch (e) { toast(e.message); } }
+
+// ── КАМПАНИИ (UTM) ───────────────────────────────────────────────────────────
+RENDER.campaigns = async function () {
+  const el = document.getElementById('tab-campaigns');
+  el.innerHTML = '<div class="card"><b>Новая кампания</b>'
+    + '<div class="mut">Метка для отслеживания воронки: клик по ссылке → регистрация в боте → оплата. Раздавайте ссылку в рекламе (VK, каналы, блогеры).</div>'
+    + '<div class="row" style="margin-top:8px"><input id="cm_name" placeholder="Название (Реклама VK)" class="grow"><input id="cm_code" placeholder="метка VK1 (латиница)" style="max-width:170px"></div>'
+    + '<div style="margin-top:8px"><button class="btn" onclick="addCampaign()">Создать</button></div></div>'
+    + '<div class="card"><b>Кампании</b><div id="cm_list" class="mut">загрузка…</div></div>';
+  try {
+    const r = await api('/campaigns');
+    const list = r.campaigns || [];
+    if (!r.botUsername) el.querySelector('.card .mut').innerHTML += '<br><span style="color:var(--warn,#f0ad4e)">⚠ Бот не настроен — ссылки появятся после подключения бота.</span>';
+    document.getElementById('cm_list').innerHTML = list.length ? '<table><tr><th>Кампания</th><th>Ссылка</th><th>Клики</th><th>Рег.</th><th>Оплат</th><th>Доход</th><th></th></tr>'
+      + list.map((c) => {
+        const cr = c.regs ? Math.round((c.paid / c.regs) * 100) : 0;
+        const linkUrl = location.origin + '/c/' + c.code;
+        return `<tr><td><b>${esc(c.name)}</b> <span class="mut">${esc(c.code)}</span></td>`
+          + `<td>${c.link ? `<button class="btn sec sm" onclick='copyText(${JSON.stringify(linkUrl)})'>📋 ссылка</button>` : '<span class="mut">—</span>'}</td>`
+          + `<td class="mut">${c.clicks}</td><td class="mut">${c.regs}</td><td class="mut">${c.paid} <span class="mut">(${cr}%)</span></td><td>${Number(c.revenue).toLocaleString('ru-RU')}₽</td>`
+          + `<td><button class="btn bad sm" onclick='delCampaign(${JSON.stringify(c.id)})'>×</button></td></tr>`;
+      }).join('') + '</table>'
+      : '<span class="mut">нет кампаний</span>';
+  } catch (e) { document.getElementById('cm_list').textContent = e.message; }
+};
+async function addCampaign() {
+  const body = { name: document.getElementById('cm_name').value.trim(), code: document.getElementById('cm_code').value.trim() };
+  if (!body.name) return toast('укажи название');
+  try { await api('/campaigns', { method: 'POST', body: JSON.stringify(body) }); toast('кампания создана'); RENDER.campaigns(); } catch (e) { toast(e.message); }
+}
+async function delCampaign(id) { if (!confirm('Удалить кампанию? Привязка клиентов снимется.')) return; try { await api('/campaigns/' + id, { method: 'DELETE' }); RENDER.campaigns(); } catch (e) { toast(e.message); } }
 
 // ── ПЛАТЁЖКИ ─────────────────────────────────────────────────────────────────
 RENDER.payments = async function () {

@@ -38,6 +38,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { GiftsModule } from './gifts/gifts.module';
 import { PromoGroupsModule } from './promo-groups/promo-groups.module';
+import { CampaignsModule } from './campaigns/campaigns.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { PromoGroupsModule } from './promo-groups/promo-groups.module';
     TicketsModule,
     GiftsModule,
     PromoGroupsModule,
+    CampaignsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

@@ -53,6 +53,8 @@ model User {
   balance      Decimal  @default(0)
   promoGroupId String?  // сегмент со скидкой (PromoGroup)
   promoGroup   PromoGroup? @relation(fields: [promoGroupId], references: [id])
+  campaignId   String?  // UTM-кампания, приведшая клиента
+  campaign     Campaign? @relation(fields: [campaignId], references: [id])
   createdAt    DateTime @default(now())
   devices      Device[]
   payments     Payment[]
@@ -61,6 +63,7 @@ model User {
   @@unique([tenantId, tgId]) // Phase 0 изоляция: (тенант, tg) = 1 аккаунт
   @@index([tenantId, externalId]) // дедуп при импорте по исходному id
   @@index([promoGroupId])
+  @@index([campaignId])
 }
 
 /// Промо-группа: сегмент клиентов с фиксированной скидкой (%) на оплату/продление.
@@ -71,6 +74,17 @@ model PromoGroup {
   discountPct Int      @default(0) // 0..100
   createdAt   DateTime @default(now())
   users       User[]
+}
+
+/// UTM-кампания: трекинг воронки переход(клик)→регистрация→оплата по метке.
+model Campaign {
+  id        String   @id @default(cuid())
+  tenantId  String?
+  name      String
+  code      String   @unique // метка в ссылке /c/<code> и в ?start=c_<code>
+  clicks    Int      @default(0)
+  createdAt DateTime @default(now())
+  users     User[]
 }
 
 /// Тикеты поддержки: обращения клиента (из бота/кабинета) и ответы админа.

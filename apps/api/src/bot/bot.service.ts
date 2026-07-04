@@ -10,6 +10,7 @@ import { PlansService } from '../plans/plans.service';
 import { BroadcastService } from '../broadcast/broadcast.service';
 import { PromoService } from '../promo/promo.service';
 import { GiftsService } from '../gifts/gifts.service';
+import { CampaignsService } from '../campaigns/campaigns.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { FeaturesService } from '../features/features.service';
 import { tg, InlineButton } from './telegram';
@@ -39,6 +40,7 @@ export class BotService implements OnModuleInit {
     private broadcast: BroadcastService,
     private promo: PromoService,
     private gifts: GiftsService,
+    private campaigns: CampaignsService,
     private tickets: TicketsService,
     private features: FeaturesService,
   ) {}
@@ -217,6 +219,9 @@ export class BotService implements OnModuleInit {
       // реф-ссылка: /start ref_<code> → привязать пригласившего (только для новых)
       const m = msg.text.match(/\/start\s+ref_(\w+)/);
       if (m && isNew) await this.referral.link(user.id, m[1]).catch(() => {});
+      // UTM-кампания: /start c_<code> → привязать кампанию (только для новых)
+      const cm = msg.text.match(/\/start\s+c_(\w+)/);
+      if (cm && isNew) await this.campaigns.attribute(user.id, cm[1]).catch(() => {});
       if (!(await this.gates(msg.chat.id, user, from.id))) return;
       await this.sendWelcomeMsg(msg.chat.id, await this.menu());
     } else {

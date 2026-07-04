@@ -7,8 +7,8 @@ import { Injectable } from '@nestjs/common';
  *
  * По умолчанию включён базовый набор; campaigns/franchises — по запросу.
  */
-const DEFAULT_ON = ['bot', 'cabinet', 'payments', 'bypass', 'referral', 'promo', 'tickets', 'gifts'];
-const KNOWN = [...DEFAULT_ON, 'campaigns', 'franchises'];
+const DEFAULT_ON = ['bot', 'cabinet', 'payments', 'bypass', 'referral', 'promo', 'tickets', 'gifts', 'campaigns'];
+const KNOWN = [...DEFAULT_ON, 'franchises'];
 
 @Injectable()
 export class FeaturesService {

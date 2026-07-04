@@ -29,6 +29,7 @@ async function bootstrap() {
       'sub/:token', 'sub/:token/xray',
       't/:code', // короткий ТВ-роут подписки
       'cabinet/:token', // страница кабинета (данные — под /api/cabinet/:token/data)
+      'c/:code', // короткая ссылка UTM-кампании (клик-трекер → редирект в бота)
     ],
   });
   await app.listen(Number(process.env.API_PORT) || 3000);

@@ -9,10 +9,11 @@ import { PlansModule } from '../plans/plans.module';
 import { BroadcastModule } from '../broadcast/broadcast.module';
 import { PromoModule } from '../promo/promo.module';
 import { GiftsModule } from '../gifts/gifts.module';
+import { CampaignsModule } from '../campaigns/campaigns.module';
 import { BotService } from './bot.service';
 
 @Module({
-  imports: [SettingsModule, UsersModule, DevicesModule, PaymentsModule, BypassModule, ReferralModule, PlansModule, BroadcastModule, PromoModule, GiftsModule],
+  imports: [SettingsModule, UsersModule, DevicesModule, PaymentsModule, BypassModule, ReferralModule, PlansModule, BroadcastModule, PromoModule, GiftsModule, CampaignsModule],
   providers: [BotService],
 })
 export class BotModule {}

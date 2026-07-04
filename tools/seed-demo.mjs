@@ -15,6 +15,9 @@ const NICKS = ['travel', 'gamer', 'coder', 'music', 'crypto', 'movies', 'student
 
 async function wipe() {
   // порядок: сначала зависимые
+  // тикеты/подарки чистим отдельно (могут отсутствовать на старых схемах)
+  try { await db.ticketMessage.deleteMany({}); await db.ticket.deleteMany({}); } catch {}
+  try { await db.giftCode.deleteMany({}); } catch {}
   await db.$transaction([
     db.keySyncStatus.deleteMany({}), db.promoRedemption.deleteMany({}), db.userHwid.deleteMany({}),
     db.bypassUsage.deleteMany({}), db.device.deleteMany({}), db.payment.deleteMany({}),
@@ -119,6 +122,18 @@ async function main() {
   await db.ledgerEntry.create({ data: { tenantId, kind: 'expense', amount: 8400, note: 'Аренда серверов (мес.)', createdAt: daysAgo(12) } });
   await db.ledgerEntry.create({ data: { tenantId, kind: 'expense', amount: 15000, note: 'Реклама (Telegram Ads)', createdAt: daysAgo(20) } });
   await db.ledgerEntry.create({ data: { tenantId, kind: 'income', amount: 6000, note: 'Партнёрская выплата', createdAt: daysAgo(8) } });
+
+  // ── тикеты поддержки (для демо-вкладки «Поддержка») ──
+  try {
+    const subjects = ['Не подключается на iPhone', 'Как оплатить криптой?', 'YouTube тормозит', 'Не пришёл ключ', 'Нужно ещё устройство', 'Медленно на ПК', 'Спасибо, всё работает!', 'Вопрос по обходу'];
+    const firstMsg = ['Здравствуйте! Помогите разобраться, не получается подключиться.', 'Добрый день! Как оплатить? Карты нет, только крипта.', 'Видео подтормаживает вечером, что делать?', 'Оплатил, но ключ не пришёл в бот.', 'Можно добавить ещё одно устройство на подписку?'];
+    for (const u of users.filter(() => Math.random() < 0.06)) {
+      const st = pick(['open', 'open', 'answered', 'closed']);
+      const t = await db.ticket.create({ data: { tenantId, userId: u.id, subject: pick(subjects), status: st, createdAt: daysAgo(rnd(20)),
+        messages: { create: [{ fromAdmin: false, text: pick(firstMsg) }] } } });
+      if (st !== 'open') await db.ticketMessage.create({ data: { ticketId: t.id, fromAdmin: true, text: 'Здравствуйте! Уже помогли — проверьте, пожалуйста. Если что-то ещё — пишите.' } });
+    }
+  } catch (e) { /* старая схема без тикетов */ }
 
   const cnt = { users: await db.user.count(), payments: await db.payment.count(), nodes: await db.node.count(), tenants: await db.tenant.count() };
   console.log('seed готов:', JSON.stringify(cnt));

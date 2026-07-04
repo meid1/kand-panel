@@ -67,6 +67,12 @@ async function showApp() {
       document.querySelectorAll(`nav button[data-tab="${t}"]`).forEach((b) => { b.style.display = 'none'; });
     });
   } catch (e) { /* норм */ }
+  // скрыть вкладки ВЫКЛЮЧЕННЫХ фич (выбор клиента в конфигураторе установки)
+  try {
+    const feats = await api('/features');
+    const map = { payments: 'payments', promo: 'promo', franchises: 'tenants', tickets: 'tickets', gifts: 'gifts', campaigns: 'campaigns' };
+    Object.keys(map).forEach((f) => { if (feats[f] === false) document.querySelectorAll(`nav button[data-tab="${map[f]}"]`).forEach((b) => { b.style.display = 'none'; }); });
+  } catch (e) { /* норм */ }
   initNavIcons();
   switchTab('dashboard');
 }

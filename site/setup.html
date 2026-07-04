@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kand — конфигуратор установки</title>
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0B0E14;--card:#141925;--card2:#1A2030;--line:#1b2740;--txt:#E5E7EB;--mut:#94A3B8;--acc:#22D3EE;--acc2:#7dd3fc;--ok:#34D399}
+  *{box-sizing:border-box} body{margin:0;font:16px/1.55 'Inter',system-ui,sans-serif;letter-spacing:-.011em;color:var(--txt);
+    background:radial-gradient(1000px 560px at 50% -12%, #0e2338 0%, var(--bg) 55%);-webkit-font-smoothing:antialiased;min-height:100vh}
+  a{color:var(--acc);text-decoration:none}
+  .wrap{max-width:920px;margin:0 auto;padding:0 20px 60px}
+  header{display:flex;align-items:center;gap:11px;padding:20px 0}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px}
+  .logo svg{width:28px;height:28px}
+  header .back{margin-left:auto;color:var(--mut);font-size:14px}
+  h1{font-size:34px;font-weight:900;letter-spacing:-.03em;margin:14px 0 6px}
+  .lead{color:var(--mut);margin:0 0 26px;max-width:640px}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px;margin:0 0 16px}
+  .step h2{font-size:16px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  .step .sn{width:26px;height:26px;border-radius:8px;background:rgba(34,211,238,.13);color:var(--acc);font-weight:800;display:inline-flex;align-items:center;justify-content:center;font-size:14px;flex:none}
+  .step .hint{color:var(--mut);font-size:13px;margin:2px 0 14px 36px}
+  .fields{margin-left:36px}
+  label.fl{display:block;color:var(--mut);font-size:13px;margin:10px 0 4px}
+  input[type=text]{width:100%;max-width:420px;padding:11px 13px;background:#0c1119;border:1px solid var(--line);border-radius:11px;color:var(--txt);outline:none;font:inherit}
+  input[type=text]:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(34,211,238,.12)}
+  .opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-left:36px}
+  @media(max-width:680px){.opts{grid-template-columns:1fr}.fields,.opts,.step .hint{margin-left:0}}
+  .opt{display:flex;gap:12px;align-items:flex-start;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:13px 14px;cursor:pointer;transition:.15s}
+  .opt:hover{border-color:rgba(34,211,238,.35)} .opt.on{border-color:var(--acc);background:rgba(34,211,238,.06)}
+  .opt .box{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line);flex:none;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:.15s}
+  .opt.on .box{background:var(--acc);border-color:var(--acc)} .opt .box svg{width:13px;height:13px;color:#05121a;opacity:0}.opt.on .box svg{opacity:1}
+  .opt .t{font-weight:600;font-size:14.5px} .opt .d{color:var(--mut);font-size:12.5px;margin-top:2px}
+  .out{position:sticky;bottom:0;margin-top:22px}
+  .cmd{background:#0c1119;border:1px solid var(--acc);border-radius:14px;padding:16px 18px;position:relative;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+  .cmd .lbl{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:9px}
+  .cmd code{font-family:ui-monospace,Menlo,monospace;font-size:13.5px;color:#d7f7ff;word-break:break-all;display:block;line-height:1.6}
+  .cmd .cp{position:absolute;top:14px;right:14px;background:var(--acc);border:0;color:#05121a;font-weight:700;border-radius:9px;padding:7px 13px;font-size:13px;cursor:pointer}
+  .note{color:var(--mut);font-size:13px;margin-top:12px;display:flex;gap:9px}
+  .note svg{width:17px;height:17px;color:var(--acc);flex:none;margin-top:1px}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(15px);opacity:0;background:#0c1119;border:1px solid var(--line);padding:11px 17px;border-radius:12px;transition:.2s;z-index:50}
+  .toast.on{opacity:1;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><svg viewBox="0 0 128 128"><defs><linearGradient id="kg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2ee6ff"/><stop offset="1" stop-color="#3B82F6"/></linearGradient></defs><line x1="40" y1="64" x2="104" y2="18" stroke="url(#kg)" stroke-width="22" stroke-linecap="round"/><line x1="40" y1="64" x2="104" y2="110" stroke="url(#kg)" stroke-width="22" stroke-linecap="round"/><rect x="20" y="14" width="24" height="100" rx="8" fill="url(#kg)"/></svg> Kand</div>
+    <a class="back" href="/">← на главную</a>
+  </header>
+
+  <h1>Конфигуратор установки</h1>
+  <p class="lead">Выберите домен и нужные возможности — получите готовую команду. Вставьте её по SSH на свой сервер (Ubuntu/Debian), и панель установится и настроится сама. Пароль сервера вводить <b>не нужно</b>.</p>
+
+  <div class="step">
+    <h2><span class="sn">1</span> Домен и HTTPS</h2>
+    <div class="hint">Домен, который A-записью указывает на ваш сервер. Оставьте пустым — поставится по IP (HTTPS тогда недоступен).</div>
+    <div class="fields">
+      <label class="fl">Домен панели</label>
+      <input type="text" id="domain" placeholder="vpn.example.com" oninput="build()">
+      <div class="opts" style="margin:12px 0 0 0;grid-template-columns:1fr">
+        <div class="opt on" data-flag="https" onclick="tog(this)"><span class="box">${chk}</span><div><div class="t">Авто-HTTPS (Let's Encrypt)</div><div class="d">Автоматический бесплатный сертификат — нужен домен выше</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <h2><span class="sn">2</span> Протоколы xray</h2>
+    <div class="hint">Какие протоколы отдавать клиентам. Reality — рекомендуется.</div>
+    <div class="opts" id="protos"></div>
+  </div>
+
+  <div class="step">
+    <h2><span class="sn">3</span> Возможности панели</h2>
+    <div class="hint">Включите только нужное — выключенное не грузит сервер и не мешает клиентам. Всё можно поменять позже в панели.</div>
+    <div class="opts" id="features"></div>
+  </div>
+
+  <div class="out">
+    <div class="cmd">
+      <button class="cp" onclick="copyCmd()">Копировать</button>
+      <div class="lbl">Команда установки — вставьте на сервер по SSH</div>
+      <code id="cmd">curl -fsSL https://get.kandpanel.com/install.sh | bash</code>
+    </div>
+    <div class="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><div>После установки команда выведет адрес панели, логин и пароль. Нет своего сервера или хотите «под ключ»? Напишите <a href="https://t.me/marius_support">@marius_support</a> — поможем бесплатно.</div></div>
+  </div>
+</div>
+<div class="toast" id="toast">Скопировано</div>
+
+<script>
+const chk = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>';
+const PROTOS = [
+  {id:'reality-tcp', t:'Reality TCP', d:'Основной, максимальная маскировка', on:true},
+  {id:'reality-grpc', t:'Reality gRPC', d:'Хорош за CDN/прокси', on:true},
+  {id:'hysteria2', t:'Hysteria2', d:'UDP, быстрый на потерях', on:false},
+  {id:'xhttp', t:'XHTTP', d:'HTTP-маскировка', on:false},
+];
+const FEATURES = [
+  {id:'bot', t:'Telegram-бот', d:'Клиентский бот: подписка, оплата, триал', on:true},
+  {id:'cabinet', t:'Веб-кабинет', d:'Личный кабинет клиента по ссылке', on:true},
+  {id:'payments', t:'Онлайн-оплаты', d:'ЮKassa/Stars/крипта и др.', on:true},
+  {id:'bypass', t:'Умный обход + лимит ГБ', d:'RU-маршрутизация, метринг обхода', on:true},
+  {id:'referral', t:'Реферальная программа', d:'Приглашения и бонусы', on:true},
+  {id:'promo', t:'Промокоды и промо-группы', d:'Скидки, сегменты', on:true},
+  {id:'tickets', t:'Поддержка (тикеты)', d:'Обращения клиентов в боте/панели', on:true},
+  {id:'gifts', t:'Подарочные подписки', d:'Купить и подарить доступ', on:false},
+  {id:'campaigns', t:'UTM-кампании', d:'Трекинг переходов → оплат', on:false},
+  {id:'franchises', t:'Франшизы (мультибренд)', d:'Свои бренды/боты/домены', on:false},
+];
+function optHTML(o){return `<div class="opt ${o.on?'on':''}" data-flag="${o.id}" onclick="tog(this)"><span class="box">${chk}</span><div><div class="t">${o.t}</div><div class="d">${o.d}</div></div></div>`;}
+document.getElementById('protos').innerHTML = PROTOS.map(optHTML).join('');
+document.getElementById('features').innerHTML = FEATURES.map(optHTML).join('');
+function tog(el){el.classList.toggle('on');build();}
+function sel(container){return [...document.querySelectorAll('#'+container+' .opt.on')].map(e=>e.dataset.flag);}
+function build(){
+  const domain = document.getElementById('domain').value.trim();
+  const https = document.querySelector('.opt[data-flag="https"]').classList.contains('on');
+  const protos = sel('protos');
+  const feats = sel('features');
+  let cmd = 'curl -fsSL https://get.kandpanel.com/install.sh | bash -s --';
+  if(domain) cmd += ' --domain '+domain;
+  if(domain && https) cmd += ' --https';
+  if(protos.length && protos.length!==PROTOS.length) cmd += ' --protocols '+protos.join(',');
+  // передаём ТОЛЬКО отключённые фичи (короче команда); по умолчанию всё из списка «on»
+  const offByDefault = FEATURES.filter(f=>!f.on).map(f=>f.id);
+  const disabled = FEATURES.map(f=>f.id).filter(id=>!feats.includes(id) && !offByDefault.includes(id));
+  const enabledExtra = feats.filter(id=>offByDefault.includes(id));
+  if(disabled.length) cmd += ' --disable '+disabled.join(',');
+  if(enabledExtra.length) cmd += ' --enable '+enabledExtra.join(',');
+  document.getElementById('cmd').textContent = cmd;
+}
+function copyCmd(){const t=document.getElementById('cmd').textContent;navigator.clipboard?.writeText(t);const el=document.getElementById('toast');el.classList.add('on');setTimeout(()=>el.classList.remove('on'),1600);}
+// вставить галочку в первый (HTTPS) опт, отрисованный статически
+document.querySelector('.opt[data-flag="https"] .box').innerHTML = chk;
+build();
+</script>
+</body>
+</html>

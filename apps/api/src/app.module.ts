@@ -33,6 +33,7 @@ import { MultibotModule } from './multibot/multibot.module';
 import { FinanceModule } from './finance/finance.module';
 import { BridgeModule } from './bridge/bridge.module';
 import { SyncModule } from './sync/sync.module';
+import { FeaturesModule } from './features/features.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { SyncModule } from './sync/sync.module';
     FinanceModule,
     BridgeModule,
     SyncModule,
+    FeaturesModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

@@ -30,6 +30,7 @@ DOMAIN="${KAND_DOMAIN:-}"; HTTPS="${KAND_HTTPS:-0}"; PORT="${KAND_PORT:-3000}"
 ADMIN_PASSWORD="${KAND_ADMIN_PASSWORD:-}"; BOT_TOKEN="${KAND_BOT_TOKEN:-}"
 DIR="${KAND_DIR:-/opt/kand}"; REPO="${KAND_REPO:-https://github.com/meid1/kand-panel.git}"
 EMAIL="${KAND_EMAIL:-}"; ASSUME_YES="${KAND_YES:-0}"
+PROTOCOLS="${KAND_PROTOCOLS:-}"; DISABLE="${KAND_DISABLE:-}"; ENABLE="${KAND_ENABLE:-}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --domain) DOMAIN="$2"; shift 2;;
@@ -40,6 +41,9 @@ while [ $# -gt 0 ]; do
     --dir) DIR="$2"; shift 2;;
     --repo) REPO="$2"; shift 2;;
     --email) EMAIL="$2"; shift 2;;
+    --protocols) PROTOCOLS="$2"; shift 2;;   # список протоколов по умолчанию для новых нод
+    --disable) DISABLE="$2"; shift 2;;        # выключить возможности (через запятую): tickets,gifts,…
+    --enable) ENABLE="$2"; shift 2;;          # включить дополнительные (по умолч. выкл)
     --yes|-y) ASSUME_YES=1; shift;;
     *) die "неизвестный флаг: $1";;
   esac
@@ -102,6 +106,9 @@ JWT_SECRET=${JWT_SECRET}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 BOT_TOKEN=${BOT_TOKEN}
 VPANEL_ROOT=${DIR}
+DEFAULT_PROTOCOLS=${PROTOCOLS}
+FEATURES_DISABLED=${DISABLE}
+FEATURES_ENABLED=${ENABLE}
 EOF
 chmod 600 .env
 

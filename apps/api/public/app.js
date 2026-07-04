@@ -498,8 +498,10 @@ RENDER.nodes = async function () {
     + '<label class="fld">Протоколы</label><div class="row">' + protoBoxes('m_') + '</div>'
     + '<div style="margin-top:10px"><button class="btn" onclick="addExistingNode()">Добавить готовый сервер</button></div>'
     + '</div>'
-    + '</div><div class="card"><b>Серверы</b><div id="cdn_nodes"></div><div id="n_list" class="mut">загрузка…</div></div>';
-  loadCdnNodes();
+    + '</div>'
+    + '<div class="card"><b>🤖 WARP (ИИ-трафик)</b><div class="mut" style="font-size:12px">Выход для нейросетей (ChatGPT/Claude/Gemini) через чистый IP Cloudflare. Если текущий endpoint притормозит — переключи на другой из пула (ротация перепушит конфиг на все WARP-ноды). WARP+ лицензия даёт больше скорости.</div><div id="warp_cfg" class="mut" style="margin-top:8px">загрузка…</div></div>'
+    + '<div class="card"><b>Серверы</b><div id="cdn_nodes"></div><div id="n_list" class="mut">загрузка…</div></div>';
+  loadCdnNodes(); loadWarpCfg();
   try {
     const nodes = await api('/nodes');
     window._nodes = nodes;
@@ -519,6 +521,24 @@ RENDER.nodes = async function () {
       : '<span class="mut">пока нет нод</span>';
   } catch (e) { document.getElementById('n_list').textContent = e.message; }
 };
+async function loadWarpCfg() {
+  const box = document.getElementById('warp_cfg'); if (!box) return;
+  try {
+    const c = await api('/nodes/warp');
+    box.innerHTML = '<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">'
+      + '<span>Endpoint:</span><select id="warp_ep">' + c.endpoints.map((e) => `<option value="${e}" ${e === c.endpoint ? 'selected' : ''}>${e}</option>`).join('') + '</select>'
+      + '<button class="btn sm" onclick="saveWarpEp()">Сохранить</button>'
+      + '<button class="btn sec sm" onclick="warpRotate()">🔄 Переключить + пуш на ноды</button></div>'
+      + '<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">'
+      + `<span>WARP+ ${c.hasLicense ? '<span class="pill ok">задан</span>' : '<span class="pill">не задан</span>'}:</span>`
+      + '<input id="warp_lic" placeholder="ключ WARP+ (необязательно)" class="grow">'
+      + '<button class="btn sm" onclick="saveWarpLic()">Сохранить</button></div>';
+  } catch (e) { box.textContent = e.message; }
+}
+async function saveWarpEp() { try { await api('/nodes/warp', { method: 'PUT', body: JSON.stringify({ endpoint: document.getElementById('warp_ep').value }) }); toast('endpoint сохранён (применится при (пере)включении WARP)'); loadWarpCfg(); } catch (e) { toast(e.message); } }
+async function saveWarpLic() { try { await api('/nodes/warp', { method: 'PUT', body: JSON.stringify({ license: document.getElementById('warp_lic').value.trim() }) }); toast('WARP+ сохранён'); loadWarpCfg(); } catch (e) { toast(e.message); } }
+async function warpRotate() { if (!confirm('Переключить WARP на следующий endpoint и перепушить на все WARP-ноды?')) return; toast('переключаю…'); try { const r = await api('/nodes/warp/rotate', { method: 'POST', body: '{}' }); toast(`endpoint: ${r.endpoint} · перепушено ${r.pushed}/${r.nodes} нод`); loadWarpCfg(); } catch (e) { toast(e.message); } }
+
 async function checkNode(id) {
   const box = document.getElementById('hc_' + id);
   if (box) box.innerHTML = '<span class="mut">проверяю…</span>';

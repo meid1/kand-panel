@@ -22,6 +22,16 @@ export class NodesController {
     return this.nodes.findAll(tenantId);
   }
 
+  // ── WARP (глобально): конфиг endpoint/лицензия + ротация. ДО :id-маршрутов! ──
+  @Get('warp')
+  warpConfig() { return this.nodes.warpConfig(); }
+
+  @Put('warp')
+  setWarpConfig(@Body() dto: { endpoint?: string; license?: string }) { return this.nodes.setWarpConfig(dto); }
+
+  @Post('warp/rotate')
+  rotateWarp(@Body('endpoint') endpoint?: string) { return this.nodes.rotateWarp(endpoint); }
+
   @Get(':id')
   one(@Param('id') id: string) {
     return this.nodes.findOne(id);

@@ -76,10 +76,11 @@ export class NodesService {
     // WARP (чистый IP для нейросетей): регистрируем ключ, если включено
     let warpKey: string | null = null;
     if (dto.warp) warpKey = await this.warp.register();
+    const warpEndpoint = dto.warp ? await this.warp.endpoint() : undefined;
 
     // ПОЛНЫЙ базовый xray-конфиг ноды кладём в bundle — установщик просто пишет
     // его на диск, ничего сам не собирает (dumb installer = меньше багов).
-    const xray = this.buildXrayConfig(ibs, reality.pvk, sid, sni, warpKey);
+    const xray = this.buildXrayConfig(ibs, reality.pvk, sid, sni, warpKey, warpEndpoint);
 
     const bundle = Buffer.from(
       JSON.stringify({
@@ -156,7 +157,7 @@ export class NodesService {
   /** Базовый xray-конфиг: reality/xhttp-инбаунды + api + routing (+ WARP если задан). */
   private buildXrayConfig(
     ibs: { tag: string; protocol: string; network: string; port: number }[],
-    pvk: string, sid: string, sni: string, warpKey?: string | null,
+    pvk: string, sid: string, sni: string, warpKey?: string | null, warpEndpoint?: string,
   ) {
     const dest = `${sni}:443`;
     const inbounds: any[] = [];
@@ -195,7 +196,7 @@ export class NodesService {
         { protocol: 'freedom', tag: 'direct' },
         { protocol: 'blackhole', tag: 'block' },
         // WARP-outbound (чистый IP Cloudflare для нейросетей)
-        ...(warpKey ? [this.warp.outbound(warpKey)] : []),
+        ...(warpKey ? [this.warp.outbound(warpKey, warpEndpoint)] : []),
       ],
       routing: {
         rules: [
@@ -309,7 +310,8 @@ export class NodesService {
         warpKey = await this.warp.register();
         if (!warpKey) throw new BadRequestException('не удалось зарегистрировать WARP (Cloudflare)');
       }
-      if (!xray.outbounds.some((o: any) => o.tag === 'warp')) xray.outbounds.push(this.warp.outbound(warpKey));
+      const ep = await this.warp.endpoint();
+      if (!xray.outbounds.some((o: any) => o.tag === 'warp')) xray.outbounds.push(this.warp.outbound(warpKey, ep));
       if (!xray.routing.rules.some((r: any) => r.outboundTag === 'warp')) xray.routing.rules.push(this.warp.aiRule());
     } else {
       xray.outbounds = xray.outbounds.filter((o: any) => o.tag !== 'warp');
@@ -324,6 +326,35 @@ export class NodesService {
     try { await this.agent.setConfig(n.ip, bundle.agent_port || 8443, xray); await this.reconcile.reconcileNode(id); pushed = true; }
     catch (e: any) { error = String(e.message || e); }
     return { ok: true, warp: enable, pushed, error };
+  }
+
+  /** Глобальный WARP-конфиг для админки (endpoint + пул + есть ли WARP+ лицензия). */
+  warpConfig() { return this.warp.config(); }
+  /** Сохранить WARP-конфиг (endpoint/лицензия). */
+  setWarpConfig(dto: { endpoint?: string; license?: string }) { return this.warp.setConfig(dto); }
+
+  /**
+   * Сменить WARP-endpoint (ротация/failover) и перепушить конфиг на ВСЕ WARP-ноды.
+   * Если endpoint не задан — берём следующий из пула. Полезно, если текущий притормозил.
+   */
+  async rotateWarp(endpoint?: string) {
+    const target = endpoint || this.warp.nextEndpoint(await this.warp.endpoint());
+    await this.warp.setConfig({ endpoint: target });
+    const nodes = await this.prisma.node.findMany({ where: { warpKey: { not: null } } });
+    let pushed = 0; const failed: string[] = [];
+    for (const n of nodes) {
+      try {
+        const bundle = this.decodeBundle(n.secretKey);
+        const xray = bundle.xray || {};
+        xray.outbounds = (xray.outbounds || []).filter((o: any) => o.tag !== 'warp');
+        xray.outbounds.push(this.warp.outbound(n.warpKey!, target));
+        bundle.xray = xray;
+        await this.prisma.node.update({ where: { id: n.id }, data: { secretKey: Buffer.from(JSON.stringify(bundle)).toString('base64') } });
+        await this.agent.setConfig(n.ip, bundle.agent_port || 8443, xray);
+        pushed++;
+      } catch (e: any) { failed.push(`${n.label}: ${e.message || e}`); }
+    }
+    return { ok: true, endpoint: target, nodes: nodes.length, pushed, failed };
   }
 
   /** Материалы для РУЧНОЙ установки ноды (админ ставит сам, без curl|bash). */

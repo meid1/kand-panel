@@ -14,3 +14,7 @@ apps/api/public/*.map
 .autobuild_env
 .autobuild_prompt.txt
 .autobuild_*
+
+# бэкапы БД, создаёт update.sh/kand backup
+backups/
+*.sql.gz

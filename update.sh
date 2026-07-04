@@ -19,8 +19,9 @@ cd "$DIR"
 ver(){ grep -oE "APP_VERSION = '[^']+'" apps/api/public/app.js 2>/dev/null | head -1 | sed "s/.*'\(.*\)'.*/\1/"; }
 OLD=$(ver)
 
-# 1) локальные правки в коде — не терять
-if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+# 1) локальные правки в коде — не терять. Смотрим ТОЛЬКО отслеживаемые файлы (-uno):
+# незакоммиченные бэкапы/логи/.env не должны мешать обновлению.
+if [ -n "$(git status --porcelain -uno 2>/dev/null)" ]; then
   if [ "$FORCE" = "1" ]; then
     warn "есть локальные правки кода — прячу в git stash (вернуть потом: git stash pop)"
     git stash push -u -m "kand-update-$(date +%Y%m%d-%H%M%S)" >/dev/null 2>&1 || true

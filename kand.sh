@@ -12,6 +12,7 @@ case "$1" in
     F="backups/kand-db-$(date +%Y%m%d-%H%M%S).sql"
     if $COMPOSE exec -T postgres pg_dump -U kand kand > "$F" 2>/dev/null && [ -s "$F" ]; then
       gzip -f "$F"; echo "бэкап: $DIR/$F.gz"
+      ls -1t backups/kand-db-*.sql.gz 2>/dev/null | tail -n +15 | xargs -r rm -f  # храним 14 последних
     else rm -f "$F"; echo "не удалось снять бэкап (панель запущена?)"; exit 1; fi ;;
   logs)    $COMPOSE logs -f --tail=100 api ;;
   restart) $COMPOSE restart api; echo "перезапущено" ;;

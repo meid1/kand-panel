@@ -152,6 +152,29 @@ chmod +x "$DIR/kand.sh" "$DIR/update.sh" 2>/dev/null || true
 mkdir -p "$DIR/backups"
 if [ -f "$DIR/kand.sh" ]; then ln -sf "$DIR/kand.sh" /usr/local/bin/kand 2>/dev/null || true; fi
 
+# ── ежедневный авто-бэкап БД (systemd-таймер) ─────────────────────────────────
+if command -v systemctl >/dev/null 2>&1; then
+  cat > /etc/systemd/system/kand-backup.service <<SVC
+[Unit]
+Description=Kand — авто-бэкап БД
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/kand backup
+SVC
+  cat > /etc/systemd/system/kand-backup.timer <<TMR
+[Unit]
+Description=Kand — ежедневный бэкап БД
+[Timer]
+OnCalendar=*-*-* 04:30:00
+Persistent=true
+[Install]
+WantedBy=timers.target
+TMR
+  systemctl daemon-reload 2>/dev/null || true
+  systemctl enable --now kand-backup.timer 2>/dev/null || true
+  log "авто-бэкап БД: ежедневно 04:30 (kand backup, хранит 14 последних)"
+fi
+
 # ── итог ─────────────────────────────────────────────────────────────────────
 echo
 log "════════════════════════════════════════════"

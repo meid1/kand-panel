@@ -76,6 +76,8 @@ export class SettingsService {
   private static FLAGS: Record<string, string> = {
     'require_channel.enabled': 'Обязательная подписка на канал (вкл/выкл)',
     'require_channel': 'Канал для обязательной подписки (@username или -100id)',
+    'maintenance.enabled': 'Режим техработ (1/0): бот отвечает клиентам «идут работы»',
+    'maintenance.text': 'Текст техработ (что показать клиентам)',
     'terms.required': 'Требовать согласие с условиями (вкл/выкл)',
     'referral.reward_days': 'Реферал: дней пригласившему за 1-ю оплату',
     'referral.referee_days': 'Реферал: дней приглашённому за приход',

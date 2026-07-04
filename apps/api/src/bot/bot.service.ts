@@ -214,9 +214,19 @@ export class BotService implements OnModuleInit {
     return true;
   }
 
+  // Режим техработ: клиентам — сообщение и стоп; владельцу — всё работает.
+  private async blockedByMaintenance(chatId: number, tgId: number): Promise<boolean> {
+    if (!this.on(await this.flag('maintenance.enabled'))) return false;
+    if (await this.isOwner(tgId)) return false;
+    const txt = (await this.flag('maintenance.text')) || '🛠 Идут технические работы. Загляните чуть позже — скоро всё заработает.';
+    await tg.sendMessage(this.token, chatId, txt);
+    return true;
+  }
+
   private async onMessage(msg: any) {
     const from = msg.from;
     if (!from) return;
+    if (await this.blockedByMaintenance(msg.chat.id, from.id)) return;
     const { user, isNew } = await this.users.ensure(from.id, { username: from.username, name: [from.first_name, from.last_name].filter(Boolean).join(' ') });
     // нетекстовые сообщения (стикер/фото/пересылка) — просто показываем меню, без падений на msg.text
     if (typeof msg.text !== 'string') { await tg.sendMessage(this.token, msg.chat.id, await this.subst('Меню {brand}:'), await this.menu()); return; }
@@ -251,6 +261,7 @@ export class BotService implements OnModuleInit {
   private async onCallback(cb: any) {
     const chatId = cb.message.chat.id;
     const data = cb.data as string;
+    if (await this.blockedByMaintenance(chatId, cb.from.id)) { await tg.answerCallback(this.token, cb.id); return; }
     const { user } = await this.users.ensure(cb.from.id, { username: cb.from.username });
     await tg.answerCallback(this.token, cb.id);
 

@@ -9,6 +9,7 @@ import { ReferralService } from '../referral/referral.service';
 import { PlansService } from '../plans/plans.service';
 import { BroadcastService } from '../broadcast/broadcast.service';
 import { PromoService } from '../promo/promo.service';
+import { GiftsService } from '../gifts/gifts.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { FeaturesService } from '../features/features.service';
 import { tg, InlineButton } from './telegram';
@@ -37,6 +38,7 @@ export class BotService implements OnModuleInit {
     private plans: PlansService,
     private broadcast: BroadcastService,
     private promo: PromoService,
+    private gifts: GiftsService,
     private tickets: TicketsService,
     private features: FeaturesService,
   ) {}
@@ -280,7 +282,7 @@ export class BotService implements OnModuleInit {
       return tg.sendMessage(this.token, chatId, '✅ Автопродление включено. При истечении подписки спишем с баланса и продлим. Не забудьте держать баланс пополненным.', await this.menu());
     }
     if (data === 'referral') return this.sendReferral(chatId, user);
-    if (data === 'promo') { this.awaiting.set(chatId, 'promo'); return tg.sendMessage(this.token, chatId, '🎁 Пришлите промокод одним сообщением:'); }
+    if (data === 'promo') { this.awaiting.set(chatId, 'promo'); return tg.sendMessage(this.token, chatId, '🎁 Пришлите промокод или подарочный код одним сообщением:'); }
     // кастомная кнопка с действием «показать текст»
     if (data.startsWith('cbx:')) {
       const c = (await this.settings.getButtons())[+data.slice(4)];
@@ -303,7 +305,20 @@ export class BotService implements OnModuleInit {
     try {
       const r = await this.promo.redeem(user.id, code);
       await tg.sendMessage(this.token, chatId, `✅ Промокод активирован: ${r.message}`, await this.menu());
+      return;
     } catch (e: any) {
+      // код не промокод — пробуем как подарочный
+      if (e?.getStatus?.() === 404) {
+        try {
+          const g = await this.gifts.redeem(user.id, code);
+          await tg.sendMessage(this.token, chatId, `✅ Подарок активирован: ${g.message}`, await this.menu());
+          return;
+        } catch (ge: any) {
+          const msg = ge?.getStatus?.() === 404 ? 'код не найден' : (ge.message || 'не удалось активировать');
+          await tg.sendMessage(this.token, chatId, `❌ ${msg}`, await this.menu());
+          return;
+        }
+      }
       await tg.sendMessage(this.token, chatId, `❌ ${e.message || 'не удалось активировать'}`, await this.menu());
     }
   }

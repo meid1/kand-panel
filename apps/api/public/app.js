@@ -93,6 +93,7 @@ const NAV_ICONS = (() => {
     texts: w('<path d="M12 20h9"/><path d="M16.5 3.5a2 2 0 0 1 3 3L8 18l-4 1 1-4z"/>'),
     plans: w('<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13V22"/>'),
     promo: w('<path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2 2 2 0 0 0 0 6 2 2 0 0 1-2 2H5a2 2 0 0 1-2-2 2 2 0 0 0 0-6z"/><path d="M14 7v10"/>'),
+    gifts: w('<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M4 12v9h16v-9M12 8v13"/><path d="M12 8S9.5 3.5 7 4.8 8.5 8 12 8zM12 8s2.5-4.5 5-3.2S15.5 8 12 8z"/>'),
     broadcast: w('<path d="M22 2 11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>'),
     tenants: w('<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 21v-4h6v4"/><path d="M8 7h.01M12 7h.01M16 7h.01M8 11h.01M12 11h.01M16 11h.01"/>'),
     brand: w('<circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="10" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="15.5" cy="10" r="1"/><circle cx="10" cy="15" r="1"/>'),
@@ -937,6 +938,29 @@ async function editPromo(id, value, maxUses) {
   if (m === null) return;
   try { await api('/promo/' + id, { method: 'PATCH', body: JSON.stringify({ value: Number(v), maxUses: Number(m) }) }); toast('промокод изменён'); RENDER.promo(); } catch (e) { toast(e.message); }
 }
+
+// ── ПОДАРКИ ──────────────────────────────────────────────────────────────────
+RENDER.gifts = async function () {
+  const el = document.getElementById('tab-gifts');
+  el.innerHTML = '<div class="card"><b>Выпустить подарочные коды</b>'
+    + '<div class="mut">Код на N дней подписки. Клиент активирует его в боте (кнопка «🎁 Промокод»). Можно выпустить сразу пачку.</div>'
+    + '<div class="row" style="margin-top:8px"><input id="gf_days" type="number" placeholder="дней" style="max-width:110px"><input id="gf_count" type="number" placeholder="сколько кодов" value="1" style="max-width:150px"><input id="gf_code" placeholder="свой код (необязательно)" class="grow"></div>'
+    + '<div style="margin-top:8px"><button class="btn" onclick="addGift()">Выпустить</button></div></div>'
+    + '<div class="card"><b>Подарочные коды</b><div id="gf_list" class="mut">загрузка…</div></div>';
+  try {
+    const list = await api('/gifts');
+    document.getElementById('gf_list').innerHTML = list.length ? '<table><tr><th>Код</th><th>Дней</th><th>Статус</th><th></th></tr>'
+      + list.map(g => `<tr><td><code>${esc(g.code)}</code></td><td class="mut">${g.days}</td><td>${g.redeemedBy ? '<span class="pill">активирован</span>' : '<span class="pill ok">активен</span>'}</td><td>${g.redeemedBy ? '' : `<button class="btn bad sm" onclick="delGift('${g.id}')">×</button>`}</td></tr>`).join('') + '</table>'
+      : '<span class="mut">нет подарочных кодов</span>';
+  } catch (e) { document.getElementById('gf_list').textContent = e.message; }
+};
+async function addGift() {
+  const body = { days: +document.getElementById('gf_days').value, count: +document.getElementById('gf_count').value || 1, code: document.getElementById('gf_code').value.trim() };
+  if (!body.days) return toast('укажи количество дней');
+  if (body.code) delete body.count; // свой код — только один
+  try { const r = await api('/gifts', { method: 'POST', body: JSON.stringify(body) }); toast('выпущено кодов: ' + (r.length || 0)); RENDER.gifts(); } catch (e) { toast(e.message); }
+}
+async function delGift(id) { if (!confirm('Удалить подарочный код?')) return; try { await api('/gifts/' + id, { method: 'DELETE' }); RENDER.gifts(); } catch (e) { toast(e.message); } }
 
 // ── ПЛАТЁЖКИ ─────────────────────────────────────────────────────────────────
 RENDER.payments = async function () {

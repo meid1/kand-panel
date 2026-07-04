@@ -5,10 +5,10 @@ import { Injectable } from '@nestjs/common';
  * install.sh пишет FEATURES_DISABLED / FEATURES_ENABLED в .env. Отключённые фичи
  * не грузят сервер: скрываются вкладки в админке и кнопки в боте.
  *
- * По умолчанию включён базовый набор; gifts/campaigns/franchises — по запросу.
+ * По умолчанию включён базовый набор; campaigns/franchises — по запросу.
  */
-const DEFAULT_ON = ['bot', 'cabinet', 'payments', 'bypass', 'referral', 'promo', 'tickets'];
-const KNOWN = [...DEFAULT_ON, 'gifts', 'campaigns', 'franchises'];
+const DEFAULT_ON = ['bot', 'cabinet', 'payments', 'bypass', 'referral', 'promo', 'tickets', 'gifts'];
+const KNOWN = [...DEFAULT_ON, 'campaigns', 'franchises'];
 
 @Injectable()
 export class FeaturesService {

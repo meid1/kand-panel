@@ -8,10 +8,11 @@ import { ReferralModule } from '../referral/referral.module';
 import { PlansModule } from '../plans/plans.module';
 import { BroadcastModule } from '../broadcast/broadcast.module';
 import { PromoModule } from '../promo/promo.module';
+import { GiftsModule } from '../gifts/gifts.module';
 import { BotService } from './bot.service';
 
 @Module({
-  imports: [SettingsModule, UsersModule, DevicesModule, PaymentsModule, BypassModule, ReferralModule, PlansModule, BroadcastModule, PromoModule],
+  imports: [SettingsModule, UsersModule, DevicesModule, PaymentsModule, BypassModule, ReferralModule, PlansModule, BroadcastModule, PromoModule, GiftsModule],
   providers: [BotService],
 })
 export class BotModule {}
